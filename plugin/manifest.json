@@ -1,0 +1,10 @@
+{
+	"id": "obsidian-mineru",
+	"name": "MinerU Converter",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to Markdown via the MinerU accurate-parse API.",
+	"author": "liyifan2004",
+	"authorUrl": "https://github.com/liyifan2004",
+	"isDesktopOnly": false
+}

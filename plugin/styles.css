@@ -1,0 +1,107 @@
+/*
+ * MinerU Converter plugin styles.
+ * Uses Obsidian CSS variables so it follows the user's theme automatically.
+ * No hardcoded colors.
+ */
+
+/* ---------- Progress modal ---------- */
+
+.mineru-status {
+	font-size: 1.05em;
+	font-weight: 600;
+	color: var(--text-normal);
+	margin: 0.5em 0 0.25em 0;
+	min-height: 1.4em;
+}
+
+.mineru-status.is-success {
+	color: var(--text-success, var(--text-accent));
+}
+
+.mineru-status.is-error {
+	color: var(--text-error, var(--text-accent-hover));
+}
+
+.mineru-detail {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	word-break: break-all;
+	margin-bottom: 1em;
+	min-height: 1.2em;
+}
+
+/* Progress bar — small, thin, calm */
+.mineru-progress {
+	width: 100%;
+	height: 4px;
+	background-color: var(--background-secondary);
+	border-radius: 2px;
+	overflow: hidden;
+	margin: 0.5em 0 1.25em 0;
+}
+
+.mineru-progress-bar {
+	height: 100%;
+	background-color: var(--interactive-accent);
+	transition: width 0.3s ease-out;
+	border-radius: 2px;
+}
+
+.mineru-progress.is-indeterminate .mineru-progress-bar {
+	background-image: linear-gradient(
+		90deg,
+		transparent 0%,
+		var(--interactive-accent) 50%,
+		transparent 100%
+	);
+	background-size: 200% 100%;
+	animation: mineru-indeterminate 1.4s linear infinite;
+	width: 100% !important;
+}
+
+@keyframes mineru-indeterminate {
+	0% {
+		background-position: 200% 0;
+	}
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+/* Action button row — keep it tidy */
+.mineru-actions {
+	display: flex;
+	gap: 0.5em;
+	justify-content: flex-end;
+	margin-top: 1em;
+}
+
+.mineru-actions button {
+	margin: 0;
+}
+
+/* Tiny explanatory note under the action row */
+.mineru-hint {
+	margin-top: 1em;
+	color: var(--text-faint);
+	font-size: 0.8em;
+	font-style: italic;
+}
+
+/* ---------- Conflict modal ---------- */
+
+.mineru-conflict-path {
+	background-color: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	padding: 0.5em 0.75em;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	color: var(--text-normal);
+	white-space: pre-wrap;
+	word-break: break-all;
+	margin: 0.5em 0 1em 0;
+	max-height: 6em;
+	overflow-y: auto;
+}
