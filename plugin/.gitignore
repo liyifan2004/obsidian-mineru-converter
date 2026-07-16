@@ -20,3 +20,7 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# User-specific Obsidian vault path (set via `npm run sync --to <path>`).
+# This file is local-only — different machines may have different vault locations.
+scripts/sync-config.json

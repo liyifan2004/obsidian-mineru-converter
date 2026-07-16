@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# post-commit — auto-sync plugin artifacts to the live Obsidian vault.
+# Installed via: git config core.hooksPath plugin/hooks
+#
+# This hook runs after every `git commit`. It delegates to sync.mjs so the
+# behavior is identical to a manual `npm run sync` invocation.
+#
+# To disable temporarily:  git config core.hooksPath .git/hooks
+# To re-enable:            git config core.hooksPath plugin/hooks
+
+set -e
+
+# Resolve repo root in Windows-style path (Node on Windows needs the drive
+# letter, not POSIX-style /d/... — `pwd -W` is a Git Bash / MSYS extension).
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd -W)"
+SYNC_SCRIPT="$REPO_ROOT\\plugin\\scripts\\sync.mjs"
+
+if [ ! -f "$SYNC_SCRIPT" ]; then
+  echo "[obsidian-mineru] post-commit: sync.mjs not found at $SYNC_SCRIPT — skipping."
+  exit 0
+fi
+
+# Only sync when the commit touched plugin/ source files. This avoids pointless
+# copies when only docs/ or code/ changed.
+CHANGED_IN_PLUGIN=$(git diff-tree --no-commit-id --name-only -r HEAD | grep -E '^plugin/' | wc -l | tr -d ' ')
+
+if [ "$CHANGED_IN_PLUGIN" = "0" ]; then
+  exit 0
+fi
+
+echo "[obsidian-mineru] post-commit: plugin/ changed in this commit — syncing to Obsidian vault..."
+node "$SYNC_SCRIPT"
