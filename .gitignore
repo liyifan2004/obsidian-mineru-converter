@@ -34,3 +34,6 @@ nul
 *.env
 .env*
 secrets.*
+
+# WorkBuddy workspace memory (this repo is the workspace root)
+.workbuddy/
