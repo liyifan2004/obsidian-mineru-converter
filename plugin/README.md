@@ -59,6 +59,47 @@ npm run dev   # watch mode
 
 Source lives under `src/`. Build outputs `main.js` at the plugin root.
 
+### Deploying to your live Obsidian vault
+
+A post-commit Git hook is configured at `plugin/hooks/post-commit`. Once `core.hooksPath` is set (see below), every `git commit` that touches `plugin/` will automatically copy `main.js`, `manifest.json`, and `styles.css` to your live Obsidian vault's plugin folder.
+
+**One-time setup** (per machine, after cloning):
+
+```bash
+cd path/to/obsidian-mineru
+git config core.hooksPath plugin/hooks
+```
+
+**Default target** — already hard-coded to `D:\桌面\李轶凡的笔记仓库\学-习\.obsidian\plugins\obsidian-mineru`. No config needed on this machine.
+
+**Custom target** — three options, in priority order:
+
+```bash
+# 1. CLI flag (one-off; also persists to scripts/sync-config.json)
+npm run sync -- --to "D:\path\to\other\vault\.obsidian\plugins\obsidian-mineru"
+
+# 2. Environment variable (good for CI)
+export OBSIDIAN_PLUGINS_DIR="D:\path\to\other\vault\.obsidian\plugins\obsidian-mineru"
+
+# 3. Saved config (npm run sync --to)
+# script writes to plugin/scripts/sync-config.json (gitignored)
+```
+
+**Manual sync** (without committing):
+
+```bash
+npm run sync            # use default / saved / env-var target
+npm run build:sync      # build first, then sync (one shot)
+```
+
+**Temporarily disable** the hook:
+
+```bash
+git config core.hooksPath .git/hooks    # restore default path
+```
+
+The hook only copies when the commit changed a file under `plugin/`. Commits to `docs/`, `code/`, `README.md`, etc. will not trigger a copy.
+
 ### Project layout
 
 ```
