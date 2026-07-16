@@ -1,7 +1,7 @@
 import { TFile, Vault, requestUrl } from 'obsidian';
 import { MINERU_BASE_URL, HTTP_429_RETRY_MS, SINGLE_FILE_DATA_ID } from '../utils/constants';
 import { Logger } from '../utils/logger';
-import { extractMarkdownFromZip } from '../utils/zipExtractor';
+import { extractFromZip } from '../utils/zipExtractor';
 import { t } from '../i18n/helpers';
 import {
 	ApiResponse,
@@ -72,13 +72,16 @@ export class MinerUClient {
 	// ---------- public API ----------
 
 	/**
-	 * Convert one TFile to Markdown, returning the resulting markdown text.
-	 * Writes a sibling `.md` next to the original. Honors AbortSignal.
+	 * Convert one TFile to Markdown, returning the resulting markdown text
+	 * and the images referenced inside it. The caller writes both to disk.
+	 *
+	 * Honors AbortSignal. Throws MinerUError for known API failure modes
+	 * and DOMException('AbortError') for cancellation.
 	 */
 	async convertSingleFile(
 		file: TFile,
 		opts: ConvertOptions = {},
-	): Promise<{ mdContent: string; mdPath: string }> {
+	): Promise<{ mdContent: string; images: Map<string, ArrayBuffer> }> {
 		const onProgress = opts.onProgress ?? (() => {});
 		const signal = opts.signal;
 
@@ -117,16 +120,19 @@ export class MinerUClient {
 		onProgress({ phase: 'downloading' });
 		const zipBuffer = await this.downloadZip(myResult.full_zip_url, signal);
 
-		// 5. Extract
+		// 5. Extract — both `full.md` and the `images/` folder
 		onProgress({ phase: 'extracting' });
-		const mdContent = await extractMarkdownFromZip(zipBuffer);
-		if (mdContent == null) {
+		const extracted = await extractFromZip(zipBuffer);
+		if (extracted == null) {
 			throw new MinerUError('full.md not found in result archive', -1);
 		}
+		if (extracted.images.size > 0) {
+			log.info('Extracted', extracted.images.size, 'images');
+		}
 
-		// 6. Save (caller will handle the actual file write; we return content)
+		// 6. Done — caller will write to disk.
 		onProgress({ phase: 'saving' });
-		return { mdContent, mdPath: '' }; // mdPath is filled by caller after write
+		return { mdContent: extracted.mdContent, images: extracted.images };
 	}
 
 	/**

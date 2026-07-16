@@ -36,14 +36,23 @@ export default {
 	progressPolling: (current: number, total: number, elapsed: string) =>
 		`MinerU 解析中 — ${current}/${total} 完成（已用时 ${elapsed}）`,
 	progressDownloading: '正在下载结果…',
-	progressExtracting: '正在解压 Markdown…',
+	progressExtracting: '正在解压 Markdown 与图片…',
 	progressSaving: '正在保存到知识库…',
 	progressDone: (mdPath: string) => `完成！已保存为 ${mdPath}`,
 	progressFailed: (errMsg: string) => `失败：${errMsg}`,
+	progressCancelled: '已取消',
 	progressCancel: '取消',
 	progressClose: '关闭',
 	progressOpenResult: '打开 Markdown',
+	progressBackground: '后台运行',
+	progressBackgroundRunning: '已在后台运行',
+	progressBackgroundHint: '完成后会在右下角通知你。',
 	progressSingleHint: '提示：批量转换请使用仓库中的 Python 脚本（见 README）。',
+
+	// 后台模式通知
+	bgDoneNotice: (mdPath: string) => `✅ MinerU 转换完成：${mdPath}`,
+	bgDoneOpenedNotice: (mdPath: string) => `✅ 已打开：${mdPath}`,
+	bgFailedNotice: (errMsg: string) => `❌ MinerU 转换失败：${errMsg}`,
 
 	// 设置
 	settingsTitle: 'MinerU 转换器',

@@ -37,15 +37,24 @@ export default {
 	progressPolling: (current: number, total: number, elapsed: string) =>
 		`MinerU is parsing — ${current}/${total} done (${elapsed} elapsed)`,
 	progressDownloading: 'Downloading result…',
-	progressExtracting: 'Extracting Markdown from archive…',
+	progressExtracting: 'Extracting Markdown and images from archive…',
 	progressSaving: 'Saving Markdown to vault…',
 	progressDone: (mdPath: string) => `Done! Saved as ${mdPath}`,
 	progressFailed: (errMsg: string) => `Failed: ${errMsg}`,
+	progressCancelled: 'Cancelled',
 	progressCancel: 'Cancel',
 	progressClose: 'Close',
 	progressOpenResult: 'Open Markdown',
+	progressBackground: 'Run in background',
+	progressBackgroundRunning: 'Running in background',
+	progressBackgroundHint: 'A notification will appear when it finishes.',
 	progressSingleHint:
 		'Tip: for many files, use a Python script (see README) — the right-click flow is for one-off conversions.',
+
+	// Background-mode Notices
+	bgDoneNotice: (mdPath: string) => `✅ MinerU conversion done: ${mdPath}`,
+	bgDoneOpenedNotice: (mdPath: string) => `✅ Opened: ${mdPath}`,
+	bgFailedNotice: (errMsg: string) => `❌ MinerU conversion failed: ${errMsg}`,
 
 	// Settings
 	settingsTitle: 'MinerU Converter',
