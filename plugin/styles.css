@@ -6,6 +6,13 @@
 
 /* ---------- Progress modal ---------- */
 
+/* Shown/hidden as the conversion moves through its phases. Toggled with
+   addClass/removeClass rather than inline styles, so it stays themeable and
+   keeps the DOM free of hardcoded presentation. */
+.mineru-hidden {
+	display: none;
+}
+
 .mineru-status {
 	font-size: 1.05em;
 	font-weight: 600;

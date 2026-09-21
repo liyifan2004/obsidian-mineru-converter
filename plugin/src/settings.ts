@@ -10,6 +10,11 @@ export interface MinerUConverterSettings {
 	language: LanguageCode;
 	enableFormula: boolean;
 	enableTable: boolean;
+	/**
+	 * Split PDFs longer than {@link MAX_PAGES_PER_PDF} into parts, convert each
+	 * part, and merge the Markdown back into one file.
+	 */
+	autoSplitLargePdf: boolean;
 }
 
 export const DEFAULT_SETTINGS: MinerUConverterSettings = {
@@ -18,6 +23,7 @@ export const DEFAULT_SETTINGS: MinerUConverterSettings = {
 	language: 'ch',
 	enableFormula: true,
 	enableTable: true,
+	autoSplitLargePdf: true,
 };
 
 export class MinerUConverterSettingTab extends PluginSettingTab {
@@ -113,7 +119,7 @@ export class MinerUConverterSettingTab extends PluginSettingTab {
 					.addOption('chinese_cht', t('langChineseCht'))
 					.setValue(this.plugin.settings.language)
 					.onChange(async (value) => {
-						this.plugin.settings.language = value as LanguageCode;
+						this.plugin.settings.language = value;
 						await this.plugin.saveSettings();
 					});
 			});
@@ -140,6 +146,19 @@ export class MinerUConverterSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableTable)
 					.onChange(async (value) => {
 						this.plugin.settings.enableTable = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Auto-split oversized PDFs
+		new Setting(containerEl)
+			.setName(t('settingsAutoSplitName'))
+			.setDesc(t('settingsAutoSplitDesc'))
+			.addToggle((tg) =>
+				tg
+					.setValue(this.plugin.settings.autoSplitLargePdf)
+					.onChange(async (value) => {
+						this.plugin.settings.autoSplitLargePdf = value;
 						await this.plugin.saveSettings();
 					}),
 			);

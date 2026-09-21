@@ -4,12 +4,13 @@ Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to
 
 > Convert any document in your vault to Markdown with one right-click.
 
-## Features (v0.1)
+## Features
 
 - 🖱 **Right-click → Convert** on any supported file in the file explorer.
 - 📂 **Saves alongside the original** — `essay.pdf` becomes `essay.md`.
 - 🛡 **Conflict prompt** if a `.md` already exists (overwrite / skip / cancel).
 - 📊 **Live progress modal** with cancel button and time elapsed.
+- 🧩 **Auto-splits oversized PDFs** — a PDF longer than MinerU's 200-page limit is split into parts, parsed by the API, and merged back into a single `.md` with one shared `images/` folder.
 - 🌍 **i18n** — auto-follows your Obsidian UI language (English + Simplified Chinese out of the box; structure ready for more).
 - 🔌 **Self-hosted API key** — your token stays in your vault; the plugin calls MinerU directly with no middleman.
 
@@ -34,34 +35,51 @@ PDF · Word (`.doc` / `.docx`) · PowerPoint (`.ppt` / `.pptx`) · Excel (`.xls`
 | Document language | `ch` | OCR hint. `ch` = Chinese + English; other options cover Japanese / Korean / Latin-script / Traditional Chinese. |
 | Recognize formulas | ✅ | Outputs math as LaTeX-style. For `vlm`, only affects inline formulas. |
 | Recognize tables | ✅ | Outputs as Markdown tables. |
+| Auto-split oversized PDFs | ✅ | Split PDFs over 200 pages into parts, parse each, merge the results into one file. |
 
 ## Limits (from the MinerU API)
 
 - 200 MB per file
-- 200 pages per file (v0.1 surfaces an error rather than auto-splitting)
+- 200 pages per file — handled automatically: longer PDFs are split, parsed part by part, and merged back into one Markdown file (see *How large PDFs are handled*)
 - 50 submissions per minute across all clients of your account
 - 1,000 pages/day at high priority
+
+### How large PDFs are handled
+
+MinerU rejects any PDF above 200 pages, so the plugin works around it locally:
+
+1. Parse the PDF once with `pdf-lib` and count the pages. **At or under 200 pages, the original bytes are uploaded unchanged** — nothing is rewritten.
+2. Above 200 pages, split the page tree into ≤200-page parts and submit them one at a time (strictly sequential, to stay inside the 50 files/min limit).
+3. Merge the part Markdown back into one file, in page order, with no separator markers, and merge all images into a single `images/` folder.
+
+A part that fails fails the whole document — no partial Markdown is written. If the PDF cannot be inspected locally (encrypted or malformed), the plugin falls back to uploading it whole, exactly as it did before auto-splitting existed.
 
 For very large libraries, use the Python batch tool in [`../code/`](../code/) instead — it handles batching and 429 retries automatically.
 
 ## Roadmap
 
-- v0.2 — multi-file batch select, auto-split PDFs > 200 pages, encrypted-PDF password prompt
-- v0.3 — audio auto-embed (detect sibling `.m4a` files and prepend `![[file.m4a]]`)
-- v1.0 — folder watcher mode, callback (push) instead of polling
+- v0.2 ✅ — images/ sidecar, run-in-background, UX polish
+- v0.3 ✅ — auto-split PDFs over 200 pages, parse each part, merge back into one file
+- v0.3 (open) — encrypted-PDF password prompt, multi-file batch select
+- v1.0 — folder watcher mode, callback (push) instead of polling, audio auto-embed
 
 ## Development
 
 ```bash
 npm install
-npm run dev   # watch mode
+npm run dev    # watch mode
+npm run build  # tsc --noEmit + esbuild (production)
+npm run lint   # ESLint 9 flat config
+npm run sync   # copy the build to the vault
 ```
 
 Source lives under `src/`. Build outputs `main.js` at the plugin root.
 
 ### Deploying to your live Obsidian vault
 
-A post-commit Git hook is configured at `plugin/hooks/post-commit`. Once `core.hooksPath` is set (see below), every `git commit` that touches `plugin/` will automatically copy `main.js`, `manifest.json`, and `styles.css` to your live Obsidian vault's plugin folder.
+A post-commit Git hook lives at `plugin/hooks/post-commit`. Once `core.hooksPath` is set (see below), every `git commit` that touches `plugin/` automatically copies `main.js`, `manifest.json`, and `styles.css` to your live Obsidian vault's plugin folder.
+
+The hook never fails a commit: if the sync cannot run (no `node`, vault unreachable) it prints a warning and exits 0, and you can re-run `npm run sync` by hand.
 
 **One-time setup** (per machine, after cloning):
 
@@ -70,7 +88,7 @@ cd path/to/obsidian-mineru
 git config core.hooksPath plugin/hooks
 ```
 
-**Default target** — already hard-coded to `D:\桌面\李轶凡的笔记仓库\学-习\.obsidian\plugins\obsidian-mineru`. No config needed on this machine.
+**Default target** — hard-coded to `D:\MyNotes\学-习\.obsidian\plugins\obsidian-mineru` (Windows only; on other platforms pass `--to` or set `OBSIDIAN_PLUGINS_DIR`).
 
 **Custom target** — three options, in priority order:
 
@@ -109,6 +127,9 @@ src/
   api/
     MinerUClient.ts    # API client (submit / upload / poll / download / extract)
     types.ts           # API + progress type definitions
+  conversion/
+    DocumentConverter.ts  # orchestration: split -> parse each part -> merge
+    mergeResults.ts       # concatenate part Markdown + images
   commands/
     convertFile.ts     # Right-click menu + command palette wiring
   ui/
@@ -122,6 +143,7 @@ src/
   utils/
     constants.ts       # Supported extensions, defaults, IDs
     logger.ts          # Console logger
+    pdfSplitter.ts     # Page count + page-range splitting (pdf-lib; no obsidian imports)
     zipExtractor.ts    # JSZip wrapper for full.md extraction
 ```
 

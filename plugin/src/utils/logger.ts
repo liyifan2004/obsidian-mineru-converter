@@ -11,22 +11,18 @@ export class Logger {
 	}
 
 	debug(...args: unknown[]): void {
-		// eslint-disable-next-line no-console
 		console.debug(this.prefix, ...args);
 	}
 
 	info(...args: unknown[]): void {
-		// eslint-disable-next-line no-console
 		console.info(this.prefix, ...args);
 	}
 
 	warn(...args: unknown[]): void {
-		// eslint-disable-next-line no-console
 		console.warn(this.prefix, ...args);
 	}
 
 	error(...args: unknown[]): void {
-		// eslint-disable-next-line no-console
 		console.error(this.prefix, ...args);
 	}
 }

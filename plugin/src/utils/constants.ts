@@ -30,7 +30,13 @@ export const MINERU_BASE_URL = 'https://mineru.net';
 /** Maximum allowed file size in bytes (MinerU hard limit). */
 export const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 
-/** Maximum pages per PDF (MinerU hard limit). v0.1 only rejects, doesn't split. */
+/**
+ * Maximum pages per PDF (MinerU hard limit, enforced during extraction).
+ *
+ * DocumentConverter splits anything longer into parts of at most this many
+ * pages and merges the results, so a PDF above this limit is no longer a
+ * dead end for the user.
+ */
 export const MAX_PAGES_PER_PDF = 200;
 
 /** Recommended batch size under the 50/min rate-limit. */

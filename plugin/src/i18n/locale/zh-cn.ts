@@ -18,8 +18,18 @@ export default {
 	fileNotFound: 'MinerU：文件未找到，可能已被删除。',
 	fileTooLarge: (sizeMB: string) =>
 		`MinerU：文件 ${sizeMB} MB，超出 200 MB 上限。`,
-	pdfTooManyPages: (pages: number) =>
-		`MinerU：PDF 有 ${pages} 页，超出 200 页上限。v0.1 暂不自动拆分大 PDF。`,
+
+	// 超页数（MinerU 硬限制 200 页）相关提示
+	pdfPageLimitUnsplittable:
+		'该 PDF 超过 MinerU 的 200 页上限，且插件无法在本地拆分它（文件可能已加密、带权限保护或结构异常）。请先解密或手动拆分后再转换。',
+	pdfPageLimitAutoSplitOff:
+		'该 PDF 超过 MinerU 的 200 页上限。请到 设置 → MinerU 转换器 打开「自动拆分超大 PDF」，或先手动拆分。',
+	pdfPageLimitMismatch:
+		'插件统计的页数在 200 页以内，但 MinerU 仍判定超限。请手动拆分后再转换。',
+	nonPdfPageLimit:
+		'该文件（Word / PPT / Excel 等）转换后超过 MinerU 的 200 页上限。插件只能自动拆分 PDF，请先将其转为 PDF 再转换。',
+	partFailed: (partIndex: number, partTotal: number, msg: string) =>
+		`第 ${partIndex}/${partTotal} 部分解析失败，已中止（未生成不完整的 Markdown）：${msg}`,
 
 	// 冲突弹窗
 	conflictTitle: 'Markdown 文件已存在',
@@ -31,14 +41,33 @@ export default {
 
 	// 进度弹窗
 	progressTitle: 'MinerU 转换中',
+	progressInspecting: '正在检查 PDF 页数…',
+	progressSplitting: (done: number, total: number) =>
+		`正在拆分 PDF — ${done}/${total} 部分…`,
+	progressSplitDetail: (pages: number, parts: number) =>
+		`原文件共 ${pages} 页，将拆成 ${parts} 部分分别解析，最后合并为一个文件`,
 	progressSubmitting: '正在提交任务到 MinerU…',
 	progressUploading: (fileName: string) => `正在上传 ${fileName}…`,
 	progressPolling: (current: number, total: number, elapsed: string) =>
 		`MinerU 解析中 — ${current}/${total} 完成（已用时 ${elapsed}）`,
+	progressPollingChunk: (
+		current: number,
+		total: number,
+		elapsed: string,
+		chunkIndex: number,
+		chunkTotal: number,
+	) =>
+		`MinerU 解析中 — 第 ${chunkIndex}/${chunkTotal} 部分 ${current}/${total} 完成（已用时 ${elapsed}）`,
 	progressDownloading: '正在下载结果…',
 	progressExtracting: '正在解压 Markdown 与图片…',
+	progressMerging: '正在合并各部分结果…',
+	progressPartOf: (index: number, total: number) => `第 ${index}/${total} 部分`,
+	progressPartDone: (index: number, total: number) =>
+		`第 ${index}/${total} 部分完成，继续下一部分…`,
 	progressSaving: '正在保存到知识库…',
 	progressDone: (mdPath: string) => `完成！已保存为 ${mdPath}`,
+	progressDoneMerged: (mdPath: string, parts: number) =>
+		`完成！已把 ${parts} 部分合并并保存为 ${mdPath}`,
 	progressFailed: (errMsg: string) => `失败：${errMsg}`,
 	progressCancelled: '已取消',
 	progressCancel: '取消',
@@ -71,6 +100,9 @@ export default {
 		'开启数学公式识别（输出 LaTeX 风格）。vlm 模型下仅影响行内公式。',
 	settingsTableName: '识别表格',
 	settingsTableDesc: '开启表格结构识别（输出 Markdown 表格）。',
+	settingsAutoSplitName: '自动拆分超大 PDF（超过 200 页）',
+	settingsAutoSplitDesc:
+		'开启后：超过 200 页的 PDF 会按每 200 页自动拆分、逐部分提交解析，再把各部分合并回一个 Markdown 文件（图片统一放进同一个 images/ 目录）。合并结果与未拆分时看起来完全一致。关闭后，超过 200 页的 PDF 会直接报错。',
 	settingsTestConnection: '测试连接',
 	settingsTestOk: 'Token 看起来有效。',
 	settingsTestFail: (msg: string) => `Token 校验失败：${msg}`,
@@ -97,7 +129,7 @@ export default {
 	apiErrA0211: 'Token 已过期，请到 mineru.net 重新生成。',
 	apiErr60005: '文件超过 200 MB 大小上限。',
 	apiErr60006:
-		'PDF 超过 200 页上限。v0.1 暂不自动拆分，请先手动拆分 PDF。',
+		'文件超过 MinerU 的 200 页上限。若为 PDF，请开启「自动拆分超大 PDF」或手动拆分后再试。',
 	apiErr60007: 'MinerU 模型服务暂时不可用，请稍后重试。',
 	apiErr60009: 'MinerU 任务队列已满，请稍候再试。',
 	apiErr60018: '已达每日配额上限（1000 页），请明天再试。',

@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-mineru",
 	"name": "MinerU Converter",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"minAppVersion": "1.5.0",
-	"description": "Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to Markdown via the MinerU accurate-parse API. Includes an images/ folder sidecar and a Run-in-background option.",
+	"description": "Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to Markdown via the MinerU accurate-parse API. Auto-splits PDFs over 200 pages into parts and merges the results back into one file, with an images/ folder sidecar and a Run-in-background option.",
 	"author": "liyifan2004",
 	"authorUrl": "https://github.com/liyifan2004",
 	"isDesktopOnly": false

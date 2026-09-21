@@ -26,12 +26,12 @@ const baseLocale = moment.locale();
 /** Resolved active locale used by `t()`. */
 function resolveLocale(): typeof en {
 	const primary = localeMap[baseLocale];
-	if (primary) return { ...en, ...primary } as typeof en;
+	if (primary) return { ...en, ...primary };
 
 	// Try fallback chain
 	for (const [from, to] of FALLBACK_CHAIN) {
 		if (baseLocale.startsWith(from) && localeMap[to]) {
-			return { ...en, ...localeMap[to] } as typeof en;
+			return { ...en, ...localeMap[to] };
 		}
 	}
 	return en;

@@ -13,7 +13,7 @@ export type LanguageCode =
 	| 'korean'
 	| 'chinese_cht'
 	| 'latin'
-	| string;
+	| (string & {});
 
 export interface MinerUConfig {
 	token: string;
@@ -32,7 +32,7 @@ export interface SubmitBatchResponse {
 /** Single file's status from GET /extract-results/batch/{batch_id} */
 export interface ExtractResultItem {
 	file_name: string;
-	state: 'pending' | 'running' | 'converting' | 'done' | 'failed' | string;
+	state: 'pending' | 'running' | 'converting' | 'done' | 'failed' | (string & {});
 	err_msg?: string;
 	full_zip_url?: string;
 	data_id?: string;
@@ -57,17 +57,32 @@ export interface ApiResponse<T> {
 	trace_id?: string;
 }
 
-/** Progress phase emitted by MinerUClient.convertSingleFile. */
+/** Progress phase emitted by MinerUClient / DocumentConverter. */
 export type ProgressPhase =
+	/** Local: counting pages and deciding whether the PDF must be split. */
+	| 'inspecting'
+	/** Local: writing the split PDF parts. */
+	| 'splitting'
 	| 'submitting'
 	| 'uploading'
 	| 'parsing'
 	| 'downloading'
 	| 'extracting'
+	/** Local: stitching the parts' Markdown back together. */
+	| 'merging'
 	| 'saving'
 	| 'done'
 	| 'failed'
 	| 'cancelled';
+
+/**
+ * Which part of a split conversion is being processed. Only present when the
+ * source file had to be split (PDF > 200 pages). 1-based.
+ */
+export interface ChunkProgress {
+	index: number;
+	total: number;
+}
 
 export interface ProgressUpdate {
 	phase: ProgressPhase;
@@ -79,6 +94,10 @@ export interface ProgressUpdate {
 	total?: number;
 	/** Elapsed time in ms (parsing only). */
 	elapsedMs?: number;
+	/** Set when the conversion was split into multiple parts. */
+	chunk?: ChunkProgress;
+	/** Total page count of the source PDF (inspecting/splitting only). */
+	pages?: number;
 	/** Set when phase === 'failed'. */
 	errMsg?: string;
 	/** Set when phase === 'done'. */

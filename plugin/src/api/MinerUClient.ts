@@ -1,7 +1,7 @@
 import { TFile, Vault, requestUrl } from 'obsidian';
 import { MINERU_BASE_URL, HTTP_429_RETRY_MS, SINGLE_FILE_DATA_ID } from '../utils/constants';
 import { Logger } from '../utils/logger';
-import { extractFromZip } from '../utils/zipExtractor';
+import { extractFromZip, type ExtractedResult } from '../utils/zipExtractor';
 import { t } from '../i18n/helpers';
 import {
 	ApiResponse,
@@ -33,6 +33,30 @@ export class MinerUError extends Error {
 
 const log = new Logger('MinerUClient');
 
+/**
+ * MinerU reports "this file is too long" as a per-file `state: "failed"` with
+ * a free-text `err_msg`, not as a top-level error code. The wording has never
+ * been an explicit contract, so we match it loosely and deliberately — the
+ * only thing we do with a match is replace a raw English string with a
+ * localized, actionable message.
+ */
+const PAGE_LIMIT_PATTERNS: readonly RegExp[] = [
+	/number of pages exceeds limit/i,
+	/exceeds? the .{0,12}page limit/i,
+	/超过.{0,10}页/i,
+	/页数超过限制/i,
+];
+
+/** True if an error from this client is MinerU's page-limit rejection. */
+export function isPageLimitError(err: unknown): boolean {
+	return err instanceof MinerUError && err.code === 'page-limit';
+}
+
+function looksLikePageLimit(errMsg: string | undefined): boolean {
+	if (!errMsg) return false;
+	return PAGE_LIMIT_PATTERNS.some((re) => re.test(errMsg));
+}
+
 /** Translate common API error codes into i18n strings when possible. */
 export function localizeApiError(err: unknown): string {
 	if (!(err instanceof MinerUError)) {
@@ -43,6 +67,8 @@ export function localizeApiError(err: unknown): string {
 			return t('apiErrA0202');
 		case 'A0211':
 			return t('apiErrA0211');
+		case 'page-limit':
+			return t('apiErr60006');
 		case -60005:
 		case '60005':
 			return t('apiErr60005');
@@ -77,22 +103,40 @@ export class MinerUClient {
 	 *
 	 * Honors AbortSignal. Throws MinerUError for known API failure modes
 	 * and DOMException('AbortError') for cancellation.
+	 *
+	 * This is the whole-file path. Large PDFs are split by DocumentConverter,
+	 * which calls {@link convertBytes} once per part.
 	 */
 	async convertSingleFile(
 		file: TFile,
 		opts: ConvertOptions = {},
-	): Promise<{ mdContent: string; images: Map<string, ArrayBuffer> }> {
+	): Promise<ExtractedResult> {
+		const bytes = await this.vault.readBinary(file);
+		return this.convertBytes(file.name, bytes, opts);
+	}
+
+	/**
+	 * Same pipeline as {@link convertSingleFile} but takes the bytes directly,
+	 * so a caller that already holds them (split parts) skips a second read of
+	 * the vault. `name` is sent to MinerU as the file name and must keep its
+	 * extension — the API uses it to pick a parser.
+	 */
+	async convertBytes(
+		name: string,
+		bytes: ArrayBuffer,
+		opts: ConvertOptions = {},
+	): Promise<ExtractedResult> {
 		const onProgress = opts.onProgress ?? (() => {});
 		const signal = opts.signal;
 
 		// 1. Submit
 		onProgress({ phase: 'submitting' });
-		const { batchId, fileUrl } = await this.submitSingle(file, signal);
-		log.info('Submitted batch', batchId, 'for', file.path);
+		const { batchId, fileUrl } = await this.submitSingle(name, signal);
+		log.info('Submitted batch', batchId, 'for', name);
 
 		// 2. Upload
-		onProgress({ phase: 'uploading', message: file.name });
-		await this.uploadSingle(fileUrl, file, signal);
+		onProgress({ phase: 'uploading', message: name });
+		await this.uploadBytes(fileUrl, bytes, signal);
 
 		// 3. Poll until done/failed (single-file batch — total=1)
 		const finished = await this.pollBatch(batchId, 1, onProgress, signal);
@@ -109,7 +153,7 @@ export class MinerUClient {
 		if (myResult.state !== 'done') {
 			throw new MinerUError(
 				myResult.err_msg || `Task ended with state: ${myResult.state}`,
-				'extract-failed',
+				looksLikePageLimit(myResult.err_msg) ? 'page-limit' : 'extract-failed',
 			);
 		}
 		if (!myResult.full_zip_url) {
@@ -196,11 +240,11 @@ export class MinerUClient {
 
 	/** Submit a single file as a one-item batch. */
 	private async submitSingle(
-		file: TFile,
+		name: string,
 		signal?: AbortSignal,
 	): Promise<{ batchId: string; fileUrl: string }> {
 		const payload = {
-			files: [{ name: file.name, data_id: SINGLE_FILE_DATA_ID }],
+			files: [{ name, data_id: SINGLE_FILE_DATA_ID }],
 			model_version: this.config.modelVersion,
 			enable_formula: this.config.enableFormula,
 			enable_table: this.config.enableTable,
@@ -220,19 +264,17 @@ export class MinerUClient {
 	}
 
 	/** Upload the file to the pre-signed OSS URL. PUT, no Content-Type. */
-	private async uploadSingle(
+	private async uploadBytes(
 		uploadUrl: string,
-		file: TFile,
+		bytes: ArrayBuffer,
 		signal?: AbortSignal,
 	): Promise<void> {
-		const buf = await this.vault.readBinary(file);
-
 		// requestUrl doesn't expose PUT body=ArrayBuffer directly? It does —
 		// body can be string | ArrayBuffer. Use ArrayBuffer.
 		const res = await requestUrl({
 			url: uploadUrl,
 			method: 'PUT',
-			body: buf,
+			body: bytes,
 			throw: false,
 		});
 		// requestUrl is not abort-aware via the same path; use the signal
@@ -345,7 +387,7 @@ export class MinerUClient {
 	private async requestWithRetry<T>(
 		method: 'GET' | 'POST' | 'PUT',
 		path: string,
-		body: unknown | undefined,
+		body: unknown,
 		signal?: AbortSignal,
 	): Promise<T> {
 		const url = path.startsWith('http') ? path : `${MINERU_BASE_URL}${path}`;
@@ -360,7 +402,6 @@ export class MinerUClient {
 		}
 
 		// Manual retry loop (we keep this synchronous-feeling for 429).
-		// eslint-disable-next-line no-constant-condition
 		while (true) {
 			if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 			const res = await requestUrl(init);
@@ -419,11 +460,11 @@ export class MinerUClient {
 				reject(new DOMException('Aborted', 'AbortError'));
 				return;
 			}
-			const timer = setTimeout(resolve, ms);
+			const timer = window.setTimeout(resolve, ms);
 			signal?.addEventListener(
 				'abort',
 				() => {
-					clearTimeout(timer);
+					window.clearTimeout(timer);
 					reject(new DOMException('Aborted', 'AbortError'));
 				},
 				{ once: true },

@@ -1,5 +1,6 @@
 import { Modal, Notice, TFile } from 'obsidian';
 import { MinerUClient, MinerUError, localizeApiError } from '../api/MinerUClient';
+import { DocumentConverter } from '../conversion/DocumentConverter';
 import { t } from '../i18n/helpers';
 import type { MinerUConverterSettings } from '../settings';
 import type { ProgressUpdate } from '../api/types';
@@ -37,6 +38,8 @@ export class ProgressModal extends Modal {
 	private terminal = false;
 	private mode: Mode = 'foreground';
 	private abortController: AbortController | null = null;
+	/** Number of parts the source file was split into; 0 until we know. */
+	private mergedParts = 0;
 	/** Promise that resolves when the conversion reaches a terminal state. */
 	private workDone: Promise<void> = Promise.resolve();
 
@@ -77,7 +80,7 @@ export class ProgressModal extends Modal {
 		// Progress bar
 		this.progressEl = contentEl.createDiv({ cls: 'mineru-progress' });
 		this.progressBarEl = this.progressEl.createDiv({ cls: 'mineru-progress-bar' });
-		this.progressBarEl.style.width = '0%';
+		this.progressBarEl.setCssProps({ width: '0%' });
 
 		// Actions row
 		this.actionsEl = contentEl.createDiv({ cls: 'mineru-actions' });
@@ -100,14 +103,14 @@ export class ProgressModal extends Modal {
 			text: t('progressOpenResult'),
 			cls: 'mod-cta',
 		});
-		this.openBtn.style.display = 'none';
+		this.openBtn.addClass('mineru-hidden');
 		this.openBtn.addEventListener('click', () => this.handleOpenResult());
 
 		// [Close] — hidden until terminal; appears for failed/cancelled
 		this.closeBtn = this.actionsEl.createEl('button', {
 			text: t('progressClose'),
 		});
-		this.closeBtn.style.display = 'none';
+		this.closeBtn.addClass('mineru-hidden');
 		this.closeBtn.addEventListener('click', () => this.close());
 
 		// Hint
@@ -146,8 +149,14 @@ export class ProgressModal extends Modal {
 			this.vault,
 		);
 
+		// DocumentConverter owns the "split -> parse each part -> merge"
+		// pipeline for PDFs that exceed MinerU's 200-page limit.
+		const converter = new DocumentConverter(client, this.vault, {
+			autoSplit: this.settings.autoSplitLargePdf,
+		});
+
 		try {
-			const { mdContent, images } = await client.convertSingleFile(this.file, {
+			const { mdContent, images } = await converter.convert(this.file, {
 				onProgress: (u) => this.renderProgress(u),
 				signal: this.abortController.signal,
 			});
@@ -221,40 +230,91 @@ export class ProgressModal extends Modal {
 	}
 
 	private renderProgress(u: ProgressUpdate): void {
+		// Remember how many parts the source file was split into, so the
+		// completion line can mention the merge.
+		if (u.chunk) this.mergedParts = u.chunk.total;
+
 		switch (u.phase) {
+			case 'inspecting':
+				this.statusEl.setText(t('progressInspecting'));
+				this.detailEl.setText(this.file.path);
+				this.setProgress(null);
+				break;
+			case 'splitting': {
+				const done = u.current ?? 0;
+				const total = u.total ?? 1;
+				this.statusEl.setText(t('progressSplitting')(done, total));
+				this.detailEl.setText(
+					u.pages ? t('progressSplitDetail')(u.pages, total) : this.file.path,
+				);
+				this.setProgress(total > 0 ? done / total : null);
+				break;
+			}
 			case 'submitting':
 				this.statusEl.setText(t('progressSubmitting'));
-				this.detailEl.setText(this.file.path);
+				this.detailEl.setText(this.detailText(u));
 				this.setProgress(null);
 				break;
 			case 'uploading':
 				this.statusEl.setText(t('progressUploading')(u.message ?? this.file.name));
-				this.detailEl.setText(this.file.path);
+				this.detailEl.setText(this.detailText(u));
 				this.setProgress(null);
 				break;
 			case 'parsing': {
 				const cur = u.current ?? 0;
 				const tot = u.total ?? 1;
 				const elapsed = formatElapsed(u.elapsedMs ?? 0);
-				this.statusEl.setText(t('progressPolling')(cur, tot, elapsed));
+				if (u.chunk) {
+					this.statusEl.setText(
+						t('progressPollingChunk')(cur, tot, elapsed, u.chunk.index, u.chunk.total),
+					);
+					// Overall progress across all parts, so a split conversion
+					// does not look like it restarts from zero each time.
+					this.setProgress(((u.chunk.index - 1) + cur / tot) / u.chunk.total);
+				} else {
+					this.statusEl.setText(t('progressPolling')(cur, tot, elapsed));
+					this.setProgress(cur / tot);
+				}
 				this.detailEl.setText(this.file.path);
-				this.setProgress(cur / tot);
 				break;
 			}
 			case 'downloading':
 				this.statusEl.setText(t('progressDownloading'));
+				this.detailEl.setText(this.detailText(u));
 				this.setProgress(null);
 				break;
 			case 'extracting':
 				this.statusEl.setText(t('progressExtracting'));
+				this.detailEl.setText(this.detailText(u));
 				this.setProgress(null);
 				break;
-			case 'saving':
-				this.statusEl.setText(t('progressSaving'));
+			case 'merging':
+				this.statusEl.setText(t('progressMerging'));
+				this.detailEl.setText(this.detailText(u));
 				this.setProgress(1);
+				break;
+			case 'saving':
+				// In a split run this fires once per part; only the last one is
+				// really "saving to the vault", and the bar must not hit 100%
+				// until the whole document is done.
+				this.statusEl.setText(
+					u.chunk && u.chunk.index < u.chunk.total
+						? t('progressPartDone')(u.chunk.index, u.chunk.total)
+						: t('progressSaving'),
+				);
+				this.detailEl.setText(this.detailText(u));
+				this.setProgress(u.chunk ? u.chunk.index / u.chunk.total : 1);
 				break;
 			// done / failed / cancelled handled by their own methods
 		}
+	}
+
+	/** Detail line: prefixes the part number when the file was split. */
+	private detailText(u: ProgressUpdate): string {
+		const c = u.chunk;
+		return c
+			? `${t('progressPartOf')(c.index, c.total)} · ${this.file.path}`
+			: this.file.path;
 	}
 
 	// ---------- terminal-state handlers ----------
@@ -264,18 +324,22 @@ export class ProgressModal extends Modal {
 
 		// Background mode: modal already closed. Notify instead of showing UI.
 		if (this.mode === 'background') {
-			this.notifyBackgroundComplete(mdPath, null);
+			void this.notifyBackgroundComplete(mdPath, null);
 			return;
 		}
 
-		this.statusEl.setText(t('progressDone')(mdPath));
+		this.statusEl.setText(
+			this.mergedParts > 1
+				? t('progressDoneMerged')(mdPath, this.mergedParts)
+				: t('progressDone')(mdPath),
+		);
 		this.detailEl.setText(mdPath);
 		this.setProgress(1);
 		this.statusEl.addClass('is-success');
-		this.cancelBtn.style.display = 'none';
-		this.backgroundBtn.style.display = 'none';
-		this.closeBtn.style.display = 'none'; // hidden — Open auto-closes
-		this.openBtn.style.display = '';
+		this.cancelBtn.addClass('mineru-hidden');
+		this.backgroundBtn.addClass('mineru-hidden');
+		this.closeBtn.addClass('mineru-hidden'); // hidden — Open auto-closes
+		this.openBtn.addClass('mineru-hidden');
 		this.openBtn.dataset.mdPath = mdPath;
 	}
 
@@ -283,7 +347,7 @@ export class ProgressModal extends Modal {
 		this.terminal = true;
 
 		if (this.mode === 'background') {
-			this.notifyBackgroundComplete(null, errMsg);
+			void this.notifyBackgroundComplete(null, errMsg);
 			return;
 		}
 
@@ -291,10 +355,10 @@ export class ProgressModal extends Modal {
 		this.detailEl.setText('');
 		this.setProgress(null);
 		this.statusEl.addClass('is-error');
-		this.cancelBtn.style.display = 'none';
-		this.backgroundBtn.style.display = 'none';
-		this.openBtn.style.display = 'none';
-		this.closeBtn.style.display = '';
+		this.cancelBtn.addClass('mineru-hidden');
+		this.backgroundBtn.addClass('mineru-hidden');
+		this.openBtn.addClass('mineru-hidden');
+		this.closeBtn.addClass('mineru-hidden');
 	}
 
 	private handleCancelled(): void {
@@ -309,10 +373,10 @@ export class ProgressModal extends Modal {
 		this.detailEl.setText('');
 		this.setProgress(null);
 		this.statusEl.addClass('is-warning');
-		this.cancelBtn.style.display = 'none';
-		this.backgroundBtn.style.display = 'none';
-		this.openBtn.style.display = 'none';
-		this.closeBtn.style.display = '';
+		this.cancelBtn.addClass('mineru-hidden');
+		this.backgroundBtn.addClass('mineru-hidden');
+		this.openBtn.addClass('mineru-hidden');
+		this.closeBtn.addClass('mineru-hidden');
 	}
 
 	private async notifyBackgroundComplete(
@@ -383,14 +447,14 @@ export class ProgressModal extends Modal {
 	private setProgress(ratio: number | null): void {
 		if (ratio == null) {
 			this.progressEl.addClass('is-indeterminate');
-			this.progressBarEl.style.width = '100%';
+			this.progressBarEl.setCssProps({ width: '100%' });
 			this.progressBarEl.classList.add('is-animating');
 			return;
 		}
 		this.progressEl.removeClass('is-indeterminate');
 		this.progressBarEl.classList.remove('is-animating');
 		const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
-		this.progressBarEl.style.width = `${pct}%`;
+		this.progressBarEl.setCssProps({ width: `${pct}%` });
 	}
 }
 

@@ -57,7 +57,7 @@ export async function extractFromZip(
 
 	// 2. Collect every file under `images/` (any depth, any extension).
 	const images = new Map<string, ArrayBuffer>();
-	for (const [path, entry] of Object.entries(zip.files) as [string, JSZipEntry][]) {
+	for (const [path, entry] of Object.entries(zip.files)) {
 		if (entry.dir) continue;
 		if (!/(^|\/)images\//.test(path)) continue;
 

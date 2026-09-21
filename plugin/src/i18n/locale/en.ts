@@ -19,8 +19,18 @@ export default {
 	fileNotFound: 'MinerU: file not found — has it been deleted?',
 	fileTooLarge: (sizeMB: string) =>
 		`MinerU: file is ${sizeMB} MB, which exceeds the 200 MB limit.`,
-	pdfTooManyPages: (pages: number) =>
-		`MinerU: PDF has ${pages} pages, which exceeds the 200-page limit. v0.1 does not auto-split large PDFs.`,
+
+	// Page-limit (MinerU's hard 200-page cap) messages
+	pdfPageLimitUnsplittable:
+		'This PDF exceeds MinerU\'s 200-page limit and the plugin could not split it locally (the file may be encrypted, permission-protected, or malformed). Please decrypt or split it manually, then try again.',
+	pdfPageLimitAutoSplitOff:
+		'This PDF exceeds MinerU\'s 200-page limit. Turn on "Auto-split oversized PDFs" under Settings → MinerU Converter, or split the file manually.',
+	pdfPageLimitMismatch:
+		'The plugin counted fewer than 200 pages, but MinerU still rejected the file as too long. Please split it manually and try again.',
+	nonPdfPageLimit:
+		'This file (Word / PPT / Excel) exceeds MinerU\'s 200-page limit once converted. The plugin can only split PDFs — please convert it to PDF first.',
+	partFailed: (partIndex: number, partTotal: number, msg: string) =>
+		`Part ${partIndex}/${partTotal} failed, so the conversion was aborted (no incomplete Markdown was written): ${msg}`,
 
 	// Conflict modal
 	conflictTitle: 'Markdown file already exists',
@@ -32,14 +42,33 @@ export default {
 
 	// Progress modal
 	progressTitle: 'Converting via MinerU',
+	progressInspecting: 'Checking the PDF page count…',
+	progressSplitting: (done: number, total: number) =>
+		`Splitting the PDF — part ${done}/${total}…`,
+	progressSplitDetail: (pages: number, parts: number) =>
+		`${pages} pages in total — parsing ${parts} parts and merging them into one file`,
 	progressSubmitting: 'Submitting task to MinerU…',
 	progressUploading: (fileName: string) => `Uploading ${fileName}…`,
 	progressPolling: (current: number, total: number, elapsed: string) =>
 		`MinerU is parsing — ${current}/${total} done (${elapsed} elapsed)`,
+	progressPollingChunk: (
+		current: number,
+		total: number,
+		elapsed: string,
+		chunkIndex: number,
+		chunkTotal: number,
+	) =>
+		`MinerU is parsing — part ${chunkIndex}/${chunkTotal}, ${current}/${total} done (${elapsed} elapsed)`,
 	progressDownloading: 'Downloading result…',
 	progressExtracting: 'Extracting Markdown and images from archive…',
+	progressMerging: 'Merging the parts…',
+	progressPartOf: (index: number, total: number) => `Part ${index}/${total}`,
+	progressPartDone: (index: number, total: number) =>
+		`Part ${index}/${total} done, continuing…`,
 	progressSaving: 'Saving Markdown to vault…',
 	progressDone: (mdPath: string) => `Done! Saved as ${mdPath}`,
+	progressDoneMerged: (mdPath: string, parts: number) =>
+		`Done! Merged ${parts} parts and saved as ${mdPath}`,
 	progressFailed: (errMsg: string) => `Failed: ${errMsg}`,
 	progressCancelled: 'Cancelled',
 	progressCancel: 'Cancel',
@@ -73,6 +102,9 @@ export default {
 		'Enable math-formula recognition (LaTeX-style output). For vlm, this only affects inline formulas.',
 	settingsTableName: 'Recognize tables',
 	settingsTableDesc: 'Enable table structure recognition (Markdown tables).',
+	settingsAutoSplitName: 'Auto-split oversized PDFs (over 200 pages)',
+	settingsAutoSplitDesc:
+		'When on: a PDF longer than 200 pages is split into 200-page parts, each part is parsed by MinerU, and the results are merged back into one Markdown file (all images share a single images/ folder). The merged file looks exactly like a non-split conversion. When off, an oversized PDF fails with an error.',
 	settingsTestConnection: 'Test connection',
 	settingsTestOk: 'Token looks valid.',
 	settingsTestFail: (msg: string) => `Token check failed: ${msg}`,
@@ -99,7 +131,7 @@ export default {
 	apiErrA0211: 'Token expired. Please generate a new one at mineru.net.',
 	apiErr60005: 'File exceeds the 200 MB size limit.',
 	apiErr60006:
-		'PDF exceeds the 200-page limit. v0.1 does not auto-split — please split manually for now.',
+		'File exceeds MinerU\'s 200-page limit. For a PDF, turn on "Auto-split oversized PDFs" or split the file manually.',
 	apiErr60007: 'MinerU model service is temporarily unavailable. Please retry.',
 	apiErr60009: 'MinerU task queue is full. Please wait a moment and retry.',
 	apiErr60018: 'Daily quota exceeded (1000 pages). Try again tomorrow.',

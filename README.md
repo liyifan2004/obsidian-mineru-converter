@@ -23,6 +23,12 @@ This repository hosts the **MinerU Converter** Obsidian plugin plus the engineer
 3. Right-click any PDF / Word / PPT / Excel / image in the file explorer → **Convert to Markdown via MinerU**.
 4. A `.md` file appears next to the original. The plugin will ask if you want to open it.
 
+**PDFs longer than 200 pages** are handled automatically: the plugin splits the page tree into
+200-page parts, submits each part to MinerU in turn, then merges the Markdown and images back
+into a single `.md` file next to the original. The output looks identical to a non-split
+conversion — no part markers, one shared `images/` folder. Turn this off in
+**Settings → MinerU Converter → Auto-split oversized PDFs**.
+
 For supported formats and limits, see [docs/03-Obsidian插件开发规划.md](docs/03-Obsidian插件开发规划.md).
 
 ## Quick start (Python batch tool)

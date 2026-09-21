@@ -7,8 +7,9 @@
 #
 # To disable temporarily:  git config core.hooksPath .git/hooks
 # To re-enable:            git config core.hooksPath plugin/hooks
-
-set -e
+#
+# Deliberately NOT using `set -e`: the commit has already been created by the
+# time this runs, so a sync problem must not be reported as a failed commit.
 
 # Resolve repo root in Windows-style path (Node on Windows needs the drive
 # letter, not POSIX-style /d/... — `pwd -W` is a Git Bash / MSYS extension).
@@ -28,5 +29,30 @@ if [ "$CHANGED_IN_PLUGIN" = "0" ]; then
   exit 0
 fi
 
-echo "[obsidian-mineru] post-commit: plugin/ changed in this commit — syncing to Obsidian vault..."
-node "$SYNC_SCRIPT"
+# Resolve a node binary. The hook inherits whatever PATH git was started with,
+# which is not guaranteed to include node (git is often launched by Obsidian
+# rather than from a shell), so fall back to the usual install locations.
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE_BIN" ]; then
+  for candidate in "/d/nodejs/node.exe" "/c/Program Files/nodejs/node.exe"; do
+    if [ -x "$candidate" ]; then
+      NODE_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$NODE_BIN" ]; then
+  echo "[obsidian-mineru] post-commit: node not found — skipping vault sync."
+  echo "[obsidian-mineru] install Node.js, or run 'npm run sync' where node is available."
+  exit 0
+fi
+
+echo "[obsidian-mineru] post-commit: plugin/ changed in this commit — syncing to the Obsidian vault..."
+
+if ! "$NODE_BIN" "$SYNC_SCRIPT"; then
+  echo "[obsidian-mineru] post-commit: sync failed (see above)."
+  echo "[obsidian-mineru] the commit itself succeeded; run 'npm run sync' to retry."
+fi
+
+exit 0

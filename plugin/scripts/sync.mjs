@@ -7,7 +7,7 @@
  *      a. CLI flag:           node sync.mjs --to "D:\path\to\vault\plugins\obsidian-mineru"
  *      b. Env var:            OBSIDIAN_PLUGINS_DIR=...
  *      c. Saved config:       plugin/scripts/sync-config.json  ({ "pluginsDir": "..." })
- *      d. Default:            D:\桌面\李轶凡的笔记仓库\学-习\.obsidian\plugins\obsidian-mineru
+ *      d. Default (Windows):  D:\MyNotes\学-习\.obsidian\plugins\obsidian-mineru
  *
  *   2. Copy plugin/main.js, plugin/manifest.json, plugin/styles.css to target.
  *   3. Print a summary: which files were copied, sizes, and the final target path.
@@ -32,7 +32,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(__dirname, '..');
 const FILES = ['main.js', 'manifest.json', 'styles.css'];
 
-const DEFAULT_TARGET = 'D:\\桌面\\李轶凡的笔记仓库\\学-习\\.obsidian\\plugins\\obsidian-mineru';
+const DEFAULT_TARGET = process.platform === 'win32'
+	? 'D:\\MyNotes\\学-习\\.obsidian\\plugins\\obsidian-mineru'
+	: null;
 const CONFIG_FILE = join(__dirname, 'sync-config.json');
 
 function log(level, msg) {
@@ -111,6 +113,14 @@ async function main() {
 	if (!target) {
 		const saved = await loadSavedTarget();
 		target = saved ?? DEFAULT_TARGET;
+	}
+	if (!target) {
+		log(
+			'err',
+			'No target vault configured. Pass --to "<vault>/.obsidian/plugins/obsidian-mineru" ' +
+				'or set OBSIDIAN_PLUGINS_DIR.',
+		);
+		process.exit(1);
 	}
 
 	// 2. If a --to was passed, persist it for future runs
