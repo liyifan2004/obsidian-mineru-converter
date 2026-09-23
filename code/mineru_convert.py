@@ -21,7 +21,7 @@ MinerU Multi-Format to Markdown Batch Converter
 1. 在脚本顶部配置 TOKEN 和 ROOT_DIR
 2. python mineru_convert.py
 
-作者：WorkBuddy（李轶凡的项目沉淀）
+作者：李轶凡 (liyifan2004)
 日期：2026-07
 许可：MIT
 """

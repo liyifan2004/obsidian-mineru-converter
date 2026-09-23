@@ -1,8 +1,9 @@
 # MinerU Converter — Obsidian Plugin
 
-Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to editable Markdown via the [MinerU](https://mineru.net/apiManage/docs) accurate-parse API.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/liyifan2004/obsidian-mineru-converter?style=flat-square)](https://github.com/liyifan2004/obsidian-mineru-converter/releases)
 
-> Convert any document in your vault to Markdown with one right-click.
+Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to editable Markdown via the [MinerU](https://mineru.net/apiManage/docs) accurate-parse API.
 
 ## Features
 
@@ -40,7 +41,7 @@ PDF · Word (`.doc` / `.docx`) · PowerPoint (`.ppt` / `.pptx`) · Excel (`.xls`
 ## Limits (from the MinerU API)
 
 - 200 MB per file
-- 200 pages per file — handled automatically: longer PDFs are split, parsed part by part, and merged back into one Markdown file (see *How large PDFs are handled*)
+- 200 pages per file — handled automatically: longer PDFs are split, parsed part by part, and merged back into one Markdown file (see below)
 - 50 submissions per minute across all clients of your account
 - 1,000 pages/day at high priority
 
@@ -56,13 +57,6 @@ A part that fails fails the whole document — no partial Markdown is written. I
 
 For very large libraries, use the Python batch tool in [`../code/`](../code/) instead — it handles batching and 429 retries automatically.
 
-## Roadmap
-
-- v0.2 ✅ — images/ sidecar, run-in-background, UX polish
-- v0.3 ✅ — auto-split PDFs over 200 pages, parse each part, merge back into one file
-- v0.3 (open) — encrypted-PDF password prompt, multi-file batch select
-- v1.0 — folder watcher mode, callback (push) instead of polling, audio auto-embed
-
 ## Development
 
 ```bash
@@ -70,12 +64,12 @@ npm install
 npm run dev    # watch mode
 npm run build  # tsc --noEmit + esbuild (production)
 npm run lint   # ESLint 9 flat config
-npm run sync   # copy the build to the vault
+npm run sync   # copy the build to a vault
 ```
 
 Source lives under `src/`. Build outputs `main.js` at the plugin root.
 
-### Deploying to your live Obsidian vault
+### Deploying to a live Obsidian vault
 
 A post-commit Git hook lives at `plugin/hooks/post-commit`. Once `core.hooksPath` is set (see below), every `git commit` that touches `plugin/` automatically copies `main.js`, `manifest.json`, and `styles.css` to your live Obsidian vault's plugin folder.
 
@@ -88,25 +82,24 @@ cd path/to/obsidian-mineru
 git config core.hooksPath plugin/hooks
 ```
 
-**Default target** — hard-coded to `D:\MyNotes\学-习\.obsidian\plugins\obsidian-mineru` (Windows only; on other platforms pass `--to` or set `OBSIDIAN_PLUGINS_DIR`).
-
-**Custom target** — three options, in priority order:
+**Sync target** — the script resolves the destination vault in this priority order:
 
 ```bash
 # 1. CLI flag (one-off; also persists to scripts/sync-config.json)
-npm run sync -- --to "D:\path\to\other\vault\.obsidian\plugins\obsidian-mineru"
+npm run sync -- --to "D:\path\to\vault\.obsidian\plugins\obsidian-mineru"
 
 # 2. Environment variable (good for CI)
-export OBSIDIAN_PLUGINS_DIR="D:\path\to\other\vault\.obsidian\plugins\obsidian-mineru"
+export OBSIDIAN_PLUGINS_DIR="D:\path\to\vault\.obsidian\plugins\obsidian-mineru"
 
-# 3. Saved config (npm run sync --to)
-# script writes to plugin/scripts/sync-config.json (gitignored)
+# 3. Saved config (written by --to; file is gitignored)
+
+# 4. Built-in default (Windows; edit scripts/sync.mjs to change it)
 ```
 
 **Manual sync** (without committing):
 
 ```bash
-npm run sync            # use default / saved / env-var target
+npm run sync            # use flag / env / saved target
 npm run build:sync      # build first, then sync (one shot)
 ```
 
@@ -151,4 +144,4 @@ To add a new locale: create `src/i18n/locale/<code>.ts`, then add it to the map 
 
 ## License
 
-MIT
+[MIT](LICENSE)
