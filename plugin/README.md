@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/icon.png" alt="MinerU Converter icon" width="96" />
+</p>
+
 # MinerU Converter — Obsidian Plugin
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
