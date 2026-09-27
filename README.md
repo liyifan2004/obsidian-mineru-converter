@@ -32,6 +32,16 @@ This repository hosts the **MinerU Converter** Obsidian plugin plus the engineer
 
 For supported formats and limits, see [docs/03-Obsidian插件开发规划.md](docs/03-Obsidian插件开发规划.md).
 
+## Demo
+
+Right-click a PDF, wait a few seconds, get Markdown:
+
+![Converting a PDF to Markdown via MinerU](assets/demo.gif)
+
+**Settings** — API token, model version, OCR language, formula / table recognition, auto-split for oversized PDFs:
+
+![MinerU Converter settings](assets/settings.png)
+
 ## Quick start (Python batch tool)
 
 If you have hundreds of files to convert, the plugin's per-file flow is slow. Use the Python tools in [`code/`](code/) instead:
