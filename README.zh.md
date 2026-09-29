@@ -2,7 +2,7 @@
   <img src="assets/icon.png" alt="MinerU Converter icon" width="96" />
 </p>
 
-# obsidian-mineru
+# mineru-converter
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/liyifan2004/obsidian-mineru-converter?style=flat-square)](https://github.com/liyifan2004/obsidian-mineru-converter/releases)
@@ -64,7 +64,7 @@ npm install
 npm run dev   # watch 模式，自动重新构建 main.js
 ```
 
-本地测试：把产出的 `main.js`、`manifest.json`、`styles.css` 复制到 `<your-vault>/.obsidian/plugins/obsidian-mineru/`，然后在 Obsidian 设置中启用 **Community plugins → MinerU Converter**。
+本地测试：把产出的 `main.js`、`manifest.json`、`styles.css` 复制到 `<your-vault>/.obsidian/plugins/mineru-converter/`，然后在 Obsidian 设置中启用 **Community plugins → MinerU Converter**。
 
 ## License
 
