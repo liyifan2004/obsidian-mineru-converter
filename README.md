@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/liyifan2004/obsidian-mineru-converter?style=flat-square)](https://github.com/liyifan2004/obsidian-mineru-converter/releases)
 
+English | [简体中文](README.zh.md)
+
 > Let MinerU's accurate-parse API and Obsidian work together: convert any PDF / Word / PPT / Excel / image in your vault to editable Markdown with one right-click.
 
 This repository hosts the **MinerU Converter** Obsidian plugin plus the engineering notes and tooling behind it.
