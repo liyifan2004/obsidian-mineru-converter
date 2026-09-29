@@ -1,6 +1,6 @@
 {
   "name": "mineru-converter",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "Obsidian plugin that converts PDF/Word/PPT/Excel/images to Markdown via the MinerU API.",
   "main": "main.js",
   "type": "module",
