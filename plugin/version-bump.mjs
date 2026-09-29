@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync } from 'fs';
 
 const targetVersion = process.env.npm_package_version;
 
@@ -15,3 +15,9 @@ if (!(targetVersion in versions)) {
 	versions[targetVersion] = minAppVersion;
 	writeFileSync('versions.json', JSON.stringify(versions, null, '\t'));
 }
+
+// Keep the repo-root manifest.json / versions.json in sync.
+// The Obsidian submission bot validates the manifest at the REPOSITORY ROOT,
+// so these two files must always mirror plugin/manifest.json and plugin/versions.json.
+copyFileSync('manifest.json', '../manifest.json');
+copyFileSync('versions.json', '../versions.json');

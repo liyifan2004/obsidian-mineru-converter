@@ -1,5 +1,6 @@
 import esbuild from 'esbuild';
 import process from 'process';
+import { copyFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 
 const banner = `/*
@@ -42,6 +43,11 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	// The Obsidian submission bot reads manifest.json at the repository ROOT.
+	// Sync plugin/manifest.json (and versions.json) to the parent directory on
+	// every production build so the root copies never drift.
+	copyFileSync('manifest.json', '../manifest.json');
+	copyFileSync('versions.json', '../versions.json');
 	process.exit(0);
 } else {
 	await context.watch();
