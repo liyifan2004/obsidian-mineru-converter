@@ -109,7 +109,7 @@ async function runConvert(
 		conflict.open();
 		const choice = await conflict.waitForChoice();
 		if (choice === 'cancel') {
-			log.info('User cancelled due to conflict on', mdPath);
+			log.debug('User cancelled due to conflict on', mdPath);
 			return;
 		}
 		if (choice === 'skip') {

@@ -120,7 +120,7 @@ export class DocumentConverter {
 
 		// ---------- split path ----------
 		const totalParts = plan.parts.length;
-		log.info(
+		log.debug(
 			`PDF has ${plan.pageCount} pages — split into ${totalParts} parts of <=${this.maxPagesPerPart}`,
 		);
 
@@ -157,7 +157,7 @@ export class DocumentConverter {
 			chunk: { index: totalParts, total: totalParts },
 		});
 		const merged = mergeChunkResults(results);
-		log.info(
+		log.debug(
 			`Merged ${results.length} parts -> ${merged.mdContent.length} chars, ${merged.images.size} images`,
 		);
 		return merged;

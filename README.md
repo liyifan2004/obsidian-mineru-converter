@@ -66,6 +66,8 @@ npm run dev   # watch mode, auto-rebuilds main.js
 
 To test locally, copy the produced `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/mineru-converter/`, then enable **Community plugins → MinerU Converter** in Obsidian settings.
 
+Releases are built and attested by GitHub Actions when a bare-semver tag is pushed. Every asset carries a GitHub artifact attestation and can be verified with `gh attestation verify main.js -R liyifan2004/obsidian-mineru-converter`. See [`plugin/README.md`](plugin/README.md#release) for the release flow.
+
 ## License
 
 [MIT](LICENSE)

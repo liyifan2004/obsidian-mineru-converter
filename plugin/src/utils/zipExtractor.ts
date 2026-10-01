@@ -1,6 +1,4 @@
-import JSZip from 'jszip';
-
-type JSZipEntry = JSZip.JSZipObject;
+import { unzipSync } from 'fflate';
 
 /**
  * The output of unpacking a MinerU result ZIP.
@@ -44,21 +42,29 @@ export interface ExtractedResult {
  * The `images/` folder always lives next to `full.md`, so any relative
  * `![](images/xxx)` link inside `full.md` will resolve as long as we write
  * the images next to the .md file using the SAME relative paths.
+ *
+ * Implementation note: `fflate` is used instead of `jszip` on purpose. jszip
+ * pulls in `setimmediate`, whose browser fallback creates `<script>` elements
+ * and wraps callbacks with `new Function()` — exactly the "dynamic code
+ * execution" / "runtime script injection" patterns the Obsidian plugin review
+ * scanner rejects. fflate is pure computation with no DOM or eval surface.
  */
-export async function extractFromZip(
-	zipBuffer: ArrayBuffer,
-): Promise<ExtractedResult | null> {
-	const zip = await JSZip.loadAsync(zipBuffer);
+export function extractFromZip(zipBuffer: ArrayBuffer): ExtractedResult | null {
+	// Only inflate what we need: `full.md` and anything under `images/`.
+	// layout.json / model.json / content_list.json are skipped untouched.
+	const files = unzipSync(new Uint8Array(zipBuffer), {
+		filter: (file) =>
+			/(^|\/)full\.md$/.test(file.name) || /(^|\/)images\//.test(file.name),
+	});
 
 	// 1. Locate `full.md` (any depth — some ZIPs nest it under a folder).
-	const mdEntry = findEntry(zip, /(^|\/)full\.md$/);
-	if (!mdEntry) return null;
-	const mdContent = await mdEntry.async('string');
+	const mdPath = Object.keys(files).find((path) => /(^|\/)full\.md$/.test(path));
+	if (!mdPath) return null;
+	const mdContent = new TextDecoder().decode(files[mdPath]);
 
 	// 2. Collect every file under `images/` (any depth, any extension).
 	const images = new Map<string, ArrayBuffer>();
-	for (const [path, entry] of Object.entries(zip.files)) {
-		if (entry.dir) continue;
+	for (const [path, data] of Object.entries(files)) {
 		if (!/(^|\/)images\//.test(path)) continue;
 
 		// Normalize the key: keep the part AFTER the first "images/"
@@ -74,22 +80,18 @@ export async function extractFromZip(
 		// Deduplicate: if two archive entries map to the same key (rare),
 		// keep the first — the second would just clobber it.
 		if (images.has(key)) continue;
-		images.set(key, await entry.async('arraybuffer'));
+		images.set(key, toArrayBuffer(data));
 	}
 
 	return { mdContent, images };
 }
 
-/**
- * Find the first ZIP entry whose name matches the given regex.
- * Returns the entry, or undefined if none match.
- */
-function findEntry(zip: JSZip, pattern: RegExp): JSZipEntry | undefined {
-	for (const name of Object.keys(zip.files)) {
-		if (pattern.test(name)) {
-			const entry = zip.file(name);
-			if (entry) return entry;
-		}
+function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
+	// `unzipSync` may hand back a view onto a larger buffer; copy when it does
+	// so callers get an exactly-sized ArrayBuffer they can write directly.
+	if (u8.byteOffset === 0 && u8.byteLength === u8.buffer.byteLength) {
+		return u8.buffer as ArrayBuffer;
 	}
-	return undefined;
+	// `slice()` always returns a fresh, exactly-sized buffer.
+	return u8.slice().buffer;
 }

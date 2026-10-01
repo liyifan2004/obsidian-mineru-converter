@@ -55,6 +55,8 @@
 	border-radius: 2px;
 }
 
+/* Full width while indeterminate. JS clears the inline width when entering
+   this state, so plain specificity is enough — no !important. */
 .mineru-progress.is-indeterminate .mineru-progress-bar {
 	background-image: linear-gradient(
 		90deg,
@@ -64,7 +66,7 @@
 	);
 	background-size: 200% 100%;
 	animation: mineru-indeterminate 1.4s linear infinite;
-	width: 100% !important;
+	width: 100%;
 }
 
 @keyframes mineru-indeterminate {

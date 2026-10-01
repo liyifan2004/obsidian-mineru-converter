@@ -447,7 +447,10 @@ export class ProgressModal extends Modal {
 	private setProgress(ratio: number | null): void {
 		if (ratio == null) {
 			this.progressEl.addClass('is-indeterminate');
-			this.progressBarEl.setCssProps({ width: '100%' });
+			// Clear the inline width so the stylesheet's
+			// `.mineru-progress.is-indeterminate .mineru-progress-bar` rule owns
+			// it — no `!important` needed to beat an inline declaration.
+			this.progressBarEl.setCssProps({ width: '' });
 			this.progressBarEl.classList.add('is-animating');
 			return;
 		}

@@ -1,10 +1,10 @@
 {
-  "id": "mineru-converter",
-  "name": "MinerU Converter",
-  "version": "0.3.2",
-  "minAppVersion": "1.5.0",
-  "description": "Right-click any PDF, Word, PPT, Excel, or image in your vault to convert it to Markdown via the MinerU parse API. Long PDFs are auto-split and merged back into one file, with an images/ sidecar and a run-in-background option.",
-  "author": "liyifan2004",
-  "authorUrl": "https://github.com/liyifan2004",
-  "isDesktopOnly": false
+	"id": "mineru-converter",
+	"name": "MinerU Converter",
+	"version": "0.3.3",
+	"minAppVersion": "1.5.0",
+	"description": "Right-click any PDF, Word, PPT, Excel, or image in your vault to convert it to Markdown via the MinerU parse API. Long PDFs are auto-split and merged back into one file, with an images/ sidecar and a run-in-background option.",
+	"author": "liyifan2004",
+	"authorUrl": "https://github.com/liyifan2004",
+	"isDesktopOnly": false
 }

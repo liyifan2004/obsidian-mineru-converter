@@ -132,7 +132,7 @@ export class MinerUClient {
 		// 1. Submit
 		onProgress({ phase: 'submitting' });
 		const { batchId, fileUrl } = await this.submitSingle(name, signal);
-		log.info('Submitted batch', batchId, 'for', name);
+		log.debug('Submitted batch', batchId, 'for', name);
 
 		// 2. Upload
 		onProgress({ phase: 'uploading', message: name });
@@ -166,12 +166,12 @@ export class MinerUClient {
 
 		// 5. Extract — both `full.md` and the `images/` folder
 		onProgress({ phase: 'extracting' });
-		const extracted = await extractFromZip(zipBuffer);
+		const extracted = extractFromZip(zipBuffer);
 		if (extracted == null) {
 			throw new MinerUError('full.md not found in result archive', -1);
 		}
 		if (extracted.images.size > 0) {
-			log.info('Extracted', extracted.images.size, 'images');
+			log.debug('Extracted', extracted.images.size, 'images');
 		}
 
 		// 6. Done — caller will write to disk.

@@ -26,38 +26,14 @@ export default defineConfig([
 	},
 	...obsidianmd.configs.recommended,
 	{
+		// Type-aware rules need the program; projectService lets the parser
+		// pick the right tsconfig per file automatically.
 		files: ['src/**/*.ts'],
 		languageOptions: {
 			parserOptions: {
-				// Type-aware rules need the program; projectService lets the
-				// parser pick the right tsconfig per file automatically.
 				projectService: true,
 				tsconfigRootDir: import.meta.dirname,
 			},
-		},
-		rules: {
-			// `console.*` is how this plugin's Logger works — it deliberately
-			// routes everything through one place so users can mute it.
-			'no-console': 'off',
-		},
-	},
-	{
-		// The Logger is the single sanctioned console entry point. Obsidian's
-		// "avoid unnecessary logging" guideline targets scattered console calls;
-		// this project has exactly one, and it exists to be muzzled centrally.
-		files: ['src/utils/logger.ts'],
-		rules: {
-			'obsidianmd/rule-custom-message': 'off',
-		},
-	},
-	{
-		// pdfSplitter must stay runnable in plain Node — `.workbuddy/scratch/`
-		// bundles it to verify the split byte-for-byte, where `window` does not
-		// exist. Popout-window timer compatibility is irrelevant for a module
-		// that never touches the DOM.
-		files: ['src/utils/pdfSplitter.ts'],
-		rules: {
-			'obsidianmd/prefer-window-timers': 'off',
 		},
 	},
 ]);

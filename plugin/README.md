@@ -141,10 +141,30 @@ src/
     constants.ts       # Supported extensions, defaults, IDs
     logger.ts          # Console logger
     pdfSplitter.ts     # Page count + page-range splitting (pdf-lib; no obsidian imports)
-    zipExtractor.ts    # JSZip wrapper for full.md extraction
+    zipExtractor.ts    # fflate-based full.md / images extraction
 ```
 
 To add a new locale: create `src/i18n/locale/<code>.ts`, then add it to the map in `src/i18n/helpers.ts`.
+
+### Release
+
+Release assets are built and attested by GitHub Actions (`.github/workflows/release.yml`).
+Do not upload locally built `main.js` / `styles.css` to a public release — that breaks
+the artifact-attestation provenance chain the review scanner verifies.
+
+1. `npm version patch --no-git-tag-version` — bumps `package.json`, `manifest.json`, `versions.json` (and the repo-root copies).
+2. Commit and push.
+3. `git tag <version> && git push origin <version>` (bare semver, e.g. `0.3.3`).
+
+The workflow lints, builds, checks that the tag matches `manifest.json`, signs the
+assets via `actions/attest-build-provenance`, and creates the GitHub release with
+exactly `main.js`, `manifest.json`, `styles.css` — no extra files.
+
+Verify provenance of a downloaded asset:
+
+```bash
+gh attestation verify main.js -R liyifan2004/obsidian-mineru-converter
+```
 
 ## License
 

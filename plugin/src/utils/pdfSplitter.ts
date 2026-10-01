@@ -180,5 +180,7 @@ function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
 }
 
 function yieldToUi(): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, 0));
+	// `window.setTimeout` (not bare `setTimeout`) — required by Obsidian's
+	// popout-window compatibility guideline.
+	return new Promise((resolve) => window.setTimeout(resolve, 0));
 }

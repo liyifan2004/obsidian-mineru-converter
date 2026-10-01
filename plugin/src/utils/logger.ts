@@ -1,7 +1,11 @@
 /**
- * Lightweight console-only logger. Obsidian plugins should not use console
- * directly so users can mute plugin logs in DevTools if desired. v0.1 keeps
- * this minimal — we can add a "verbose" setting later.
+ * Lightweight console-only logger.
+ *
+ * Obsidian's "avoid unnecessary logging to console" guideline (and its review
+ * scanner) only tolerates `console.warn` / `console.error` / `console.debug`;
+ * `console.log` / `console.info` are flagged. Everything routed through this
+ * class therefore uses exactly those three methods — no direct console calls
+ * anywhere else in the codebase.
  */
 export class Logger {
 	private readonly prefix: string;
@@ -12,10 +16,6 @@ export class Logger {
 
 	debug(...args: unknown[]): void {
 		console.debug(this.prefix, ...args);
-	}
-
-	info(...args: unknown[]): void {
-		console.info(this.prefix, ...args);
 	}
 
 	warn(...args: unknown[]): void {

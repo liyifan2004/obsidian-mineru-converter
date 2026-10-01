@@ -364,11 +364,13 @@ Electron 渲染进程里，用不了 PyPDF2。加密 PDF 属于小概率场景�
 
 ### 6.1 社区发布 checklist
 
-- [ ] 写 README（中英文）
+- [x] 写 README（中英文）
 - [ ] 录 1 分钟演示视频
-- [ ] 在 Obsidian 插件市场提交（PR 到 obsidianmd/obsidian-releases）
-- [ ] GitHub Actions 自动构建 release
-- [ ] 添加 License（MIT）
+- [x] 在 Obsidian 插件市场提交（已建条目；首次自动审查未全过，逐项修复后重新发版）
+- [x] GitHub Actions 自动构建 release（构建 + artifact attestation 签名，见 `.github/workflows/release.yml`）
+- [x] 添加 License（MIT）
+
+> 自动审查关注点与规避方法见 `相关流程指南/AboutObsidianPlugins/` 中的上架经验文档。
 
 ---
 

@@ -66,6 +66,8 @@ npm run dev   # watch 模式，自动重新构建 main.js
 
 本地测试：把产出的 `main.js`、`manifest.json`、`styles.css` 复制到 `<your-vault>/.obsidian/plugins/mineru-converter/`，然后在 Obsidian 设置中启用 **Community plugins → MinerU Converter**。
 
+发版：推送纯 semver 格式 tag（如 `0.3.3`）后，GitHub Actions 自动构建并签名发布 Release。所有资产都带 GitHub artifact attestation，可用 `gh attestation verify main.js -R liyifan2004/obsidian-mineru-converter` 验证来源。完整流程见 [`plugin/README.md`](plugin/README.md#release)。
+
 ## License
 
 [MIT](LICENSE)
