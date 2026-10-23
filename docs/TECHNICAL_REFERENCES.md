@@ -37,10 +37,23 @@
   - **不采纳**：其"多格式解析器框架"抽象（每格式一个 importer 类）。本插件的解析在云端（MinerU API），本地只做 PDF 拆分，抽象层收益低、复杂度高。
 - 许可证：未逐文件核对（README 未见 LICENSE 说明）。本次不复制其任何代码，只借鉴做法。
 
+## R-06 MinerU 响应壳有两种形状（实测，2026-10-23）
+
+- 要解决的问题：`testConnection` 对无效 token 误报"有效"；错误码映射疑似失灵。
+- 方法：用**故意无效的 token** 直接探测 `GET https://mineru.net/api/v4/extract-results/batch/00000000-0000-0000-0000-000000000000`（不涉及任何真实凭据）。
+- 实测结果（直接证实）：
+  - 无效 token → `HTTP 401`，响应体 `{"traceId":"…","msgCode":"A0211","msg":"user token expired","data":null,"success":false,"total":0}`。
+  - 不带 Authorization → `HTTP 401`，纯文本 `login required`。
+- 结论：鉴权失败走 `msgCode`（字符串）+ `success` 壳；业务响应走 `code`（数字/字符串）+ `trace_id` 壳（见 `docs/01-API文档理解.md` §5 实测样例）。旧代码只认 `code`，两种失灵都由此而来。
+- 决定：**采纳归一化**——`ApiResponse` 同时声明两种壳，`envelopeCode()` 统一取码；`testConnection` 判定改为
+  200=有效、401/403=无效（按 `msgCode` 给 A0202/A0211 提示）、其他 4xx=鉴权已通过。
+- 待验证：**有效 token** 下零 UUID 探测返回什么状态码（现在按"其他 4xx=有效"处理，若实测是 200 也兼容）。
+
 ## R-05 未核实 / 待验证
 
 | 事项 | 现状 | 需要什么才能定论 |
 | --- | --- | --- |
-| `testConnection` 对无效 token 究竟返回 400/401 哪种 + 什么 code | 推断 400/401 均可能，现判定偏宽松（F-012） | 拿一个无效 token 实测一次 |
-| HTML 文件用非 MinerU-HTML 模型时服务端报什么错 | 依据 `docs/01-API文档理解.md`（自写笔记，非官方）"必须使用 MinerU-HTML" | 实测或查 MinerU 官方 API 文档（https://mineru.net/apiManage/docs） |
-| `copyPages` 对扫描件 / AcroForm / Tagged PDF 的行为 | 未实测 | 带真实样本跑 `verify-split.ts <pdf>` |
+| ~~`testConnection` 对无效 token 返回什么~~ | **已核实**（R-06）：401 + `msgCode: A0211` | — |
+| 有效 token 对不存在的 batch id 返回什么 | 推断为 4xx（已按"鉴权通过"处理） | 拿有效 token 点一次 [测试连接] |
+| HTML 文件用非 MinerU-HTML 模型时服务端报什么错 | 依据 `docs/01-API文档理解.md`（自写笔记）"必须使用 MinerU-HTML" | 实测或查 MinerU 官方 API 文档（https://mineru.net/apiManage/docs） |
+| `copyPages` 对扫描件 / AcroForm / Tagged PDF 的行为 | 未实测 | 带真实样本跑 `node test/run.mjs verify-split -- <pdf>` |

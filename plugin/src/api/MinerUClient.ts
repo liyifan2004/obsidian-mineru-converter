@@ -63,6 +63,29 @@ function looksLikePageLimit(errMsg: string | undefined): boolean {
 	return PAGE_LIMIT_PATTERNS.some((re) => re.test(errMsg));
 }
 
+/**
+ * MinerU answers with two different envelope shapes (observed 2026-10-23):
+ *   - business:     `{ code, msg, data, trace_id }`
+ *   - gateway/auth: `{ success, msgCode, msg, data, traceId, total }`
+ * Pick the code out of whichever shape came back, so error mapping below works
+ * for both. Returns undefined when the body carries no code at all.
+ */
+function envelopeCode(
+	envelope: ApiResponse<unknown> | undefined,
+): number | string | undefined {
+	return envelope?.code ?? envelope?.msgCode;
+}
+
+/** Parse the response body as an envelope; undefined when it isn't JSON. */
+function safeEnvelope(res: { json: unknown }): ApiResponse<unknown> | undefined {
+	try {
+		const body = res.json as ApiResponse<unknown> | undefined;
+		return typeof body === 'object' && body !== null ? body : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** Translate common API error codes into i18n strings when possible. */
 export function localizeApiError(err: unknown): string {
 	if (!(err instanceof MinerUError)) {
@@ -188,15 +211,19 @@ export class MinerUClient {
 	}
 
 	/**
-	 * Lightweight token check: submit a tiny test task. The cheapest "real"
-	 * probe we have without a dedicated ping endpoint. We submit the file as
-	 * a single-file batch and immediately query the status — if auth works we
-	 * get any response with code=0 or code != A0202/A0211.
+	 * Token check: probe `GET /extract-results/batch/<zero-uuid>` — the
+	 * cheapest "real" request we have without a dedicated ping endpoint. The
+	 * batch id is intentionally nonexistent; we only care how the auth layer
+	 * answers.
 	 *
-	 * To avoid actually creating parsing work, we use a HEAD-style probe:
-	 * simply check whether /api/v4/extract-results/batch/<random-uuid>
-	 * responds with a non-A0202 code. A non-A0202 code means the token is at
-	 * least being read; A0202/A0211 means it's invalid/expired.
+	 * Judgement is evidence-based (live probe with a deliberately invalid
+	 * token, 2026-10-23): a rejected token comes back as HTTP 401 with
+	 * `{ success: false, msgCode: "A0211", msg: "user token expired" }`.
+	 * So:
+	 *   - 200        → token accepted.
+	 *   - 401 / 403  → token rejected (A0202 = invalid, A0211 = expired).
+	 *   - other 4xx  → the request got past auth, so the token works; the
+	 *                  probe id itself is what the API complained about.
 	 */
 	async testConnection(): Promise<{ ok: boolean; message: string }> {
 		try {
@@ -207,25 +234,23 @@ export class MinerUClient {
 				headers: this.authHeaders(),
 				throw: false,
 			});
-			// Any 200 response means we got past auth.
 			if (res.status === 200) return { ok: true, message: t('settingsTestOk') };
-			// 401/403 -> token rejected. A0202 is the canonical "invalid token".
-			// Both 400 and 401 here likely mean token works but probe ID is bad —
-			// which is still proof the token authenticated.
-			if (res.status === 400 || res.status === 401 || res.status === 403) {
-				try {
-					const body = res.json as ApiResponse<unknown> | undefined;
-					if (body?.code === 'A0202' || body?.code === 'A0211') {
-						return {
-							ok: false,
-							message: localizeApiError(
-								new MinerUError(body.msg || 'invalid', body.code, res.status),
-							),
-						};
-					}
-				} catch {
-					// Body wasn't JSON; fall through to "ok".
-				}
+
+			if (res.status === 401 || res.status === 403) {
+				const body = safeEnvelope(res);
+				const code = envelopeCode(body);
+				return {
+					ok: false,
+					message: code !== undefined
+						? localizeApiError(
+								new MinerUError(body?.msg || 'invalid', code, res.status),
+							)
+						: t('apiErrA0202'),
+				};
+			}
+
+			if (res.status >= 400 && res.status < 500) {
+				// Auth passed; the nonexistent probe id is the complaint.
 				return { ok: true, message: t('settingsTestOk') };
 			}
 			return {
@@ -446,10 +471,13 @@ export class MinerUClient {
 				if (typeof envelope !== 'object' || envelope === null) {
 					throw new MinerUError('Non-object response', -500, res.status);
 				}
-				if (envelope.code !== 0) {
+				// Accept both envelope shapes; only an explicit non-zero code
+				// is an error (see envelopeCode).
+				const code = envelopeCode(envelope);
+				if (code !== undefined && code !== 0) {
 					throw new MinerUError(
 						envelope.msg || 'Unknown API error',
-						envelope.code,
+						code,
 						res.status,
 					);
 				}
@@ -460,13 +488,8 @@ export class MinerUClient {
 			}
 
 			// Non-2xx, non-429: parse the envelope (if any) for the API code.
-			let envelope: ApiResponse<unknown> | undefined;
-			try {
-				envelope = res.json as ApiResponse<unknown>;
-			} catch {
-				/* not JSON */
-			}
-			const code = envelope?.code ?? res.status;
+			const envelope = safeEnvelope(res);
+			const code = envelopeCode(envelope) ?? res.status;
 			const msg =
 				envelope?.msg || `HTTP ${res.status}: ${res.text.slice(0, 200)}`;
 			throw new MinerUError(msg, code, res.status);

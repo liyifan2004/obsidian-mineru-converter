@@ -51,10 +51,19 @@ export interface BatchResultsResponse {
 /** Generic API envelope. */
 export interface ApiResponse<T> {
 	/** MinerU returns both string codes ("A0202") and numeric codes (-60005). */
-	code: number | string;
+	code?: number | string;
+	/**
+	 * Observed 2026-10-23 (live probe with an invalid token): gateway/auth
+	 * errors use a DIFFERENT envelope — `{ success, msgCode, msg, data, traceId,
+	 * total }` — while business responses use `{ code, msg, data, trace_id }`.
+	 * Both shapes are accepted and normalized before use.
+	 */
+	msgCode?: string;
+	success?: boolean;
 	data?: T;
 	msg?: string;
 	trace_id?: string;
+	traceId?: string;
 }
 
 /** Progress phase emitted by MinerUClient / DocumentConverter. */

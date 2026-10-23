@@ -197,45 +197,55 @@ export class ProgressModal extends Modal {
 	}
 
 	/**
-	 * Write `foo.md` and `foo_images/` next to it. If `foo.md` already exists,
-	 * overwrite it (the conflict modal upstream already asked the user).
-	 * The `images/` folder is created if there are any images.
+	 * Write the images/ folder and `foo.md` next to the source file. If
+	 * `foo.md` already exists it is overwritten (the conflict modal upstream
+	 * already asked the user).
+	 *
+	 * Order matters: images first, the .md last. Image names are content
+	 * hashes, so re-writing one is byte-identical and harmless, whereas a .md
+	 * referencing images that were never written is user-visible damage. The
+	 * .md is therefore the "commit marker" of the conversion.
 	 */
 	private async writeResult(
 		mdPath: string,
 		mdContent: string,
 		images: Map<string, ArrayBuffer>,
 	): Promise<void> {
+		// Cancel wins over writing — check at the last possible moment.
+		if (this.abortController?.signal.aborted) {
+			throw new DOMException('Aborted', 'AbortError');
+		}
+
+		if (images.size > 0) {
+			const dirOfMd = mdPath.includes('/')
+				? mdPath.slice(0, mdPath.lastIndexOf('/'))
+				: '';
+			const imagesDir = dirOfMd ? `${dirOfMd}/images` : 'images';
+
+			// vault.adapter.mkdir is idempotent on Obsidian 1.5+
+			const adapter = this.vault.adapter;
+			if (!(await adapter.exists(imagesDir))) {
+				await adapter.mkdir(imagesDir);
+			}
+
+			for (const [relPath, buf] of images) {
+				const targetPath = `${imagesDir}/${relPath}`;
+				// Ensure nested subdirs like `images/sub/foo.jpg` are created.
+				const targetDir = targetPath.includes('/')
+					? targetPath.slice(0, targetPath.lastIndexOf('/'))
+					: '';
+				if (targetDir && targetDir !== imagesDir && !(await adapter.exists(targetDir))) {
+					await adapter.mkdir(targetDir);
+				}
+				await adapter.writeBinary(targetPath, buf);
+			}
+		}
+
 		const existing = this.vault.getAbstractFileByPath(mdPath);
 		if (existing instanceof TFile) {
 			await this.vault.modify(existing, mdContent);
 		} else {
 			await this.vault.create(mdPath, mdContent);
-		}
-
-		if (images.size === 0) return;
-
-		const dirOfMd = mdPath.includes('/')
-			? mdPath.slice(0, mdPath.lastIndexOf('/'))
-			: '';
-		const imagesDir = dirOfMd ? `${dirOfMd}/images` : 'images';
-
-		// vault.adapter.mkdir is idempotent on Obsidian 1.5+
-		const adapter = this.vault.adapter;
-		if (!(await adapter.exists(imagesDir))) {
-			await adapter.mkdir(imagesDir);
-		}
-
-		for (const [relPath, buf] of images) {
-			const targetPath = `${imagesDir}/${relPath}`;
-			// Ensure nested subdirs like `images/sub/foo.jpg` are created.
-			const targetDir = targetPath.includes('/')
-				? targetPath.slice(0, targetPath.lastIndexOf('/'))
-				: '';
-			if (targetDir && targetDir !== imagesDir && !(await adapter.exists(targetDir))) {
-				await adapter.mkdir(targetDir);
-			}
-			await adapter.writeBinary(targetPath, buf);
 		}
 	}
 

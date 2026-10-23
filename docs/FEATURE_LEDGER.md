@@ -125,7 +125,8 @@ flowchart TD
 - 实现位置：`ui/ConflictModal.ts`；调用点 `convertFile.ts` `runConvert()`。
 - 状态：已实现。
 - 验证方式：代码走查；未做 UI 回归。
-- 已知问题：①点按钮后 `resolve()` → `close()` → `onClose()` 会再次调用 resolver（幂等，无害）；②只检查 `.md`，不检查 `images/` 目录里同名图片（图片名是内容哈希，冲突概率极低，见 F-015）。
+- 已知问题：只检查 `.md`，不检查 `images/` 目录里同名图片（图片名是内容哈希，冲突概率极低，见 F-015）。
+  点按钮后 resolver 被调用两次的幂等问题已于 2026-10-23 修复（`settle()` 保证只 resolve 一次）。
 - 关联：F-015。
 
 ### F-005 单文件转换流水线
@@ -208,10 +209,13 @@ flowchart TD
 
 - 用户价值：录入凭据并快速确认有效。
 - 用户入口：设置页 Token 输入框（password 型）+ [Test connection]。
-- 预期行为：Token 存 `data.json`（仅本机）；测试用零值 UUID 探测 `GET /extract-results/batch/{id}`，200 视为可用。
+- 预期行为：Token 存 `data.json`（仅本机）；用零值 UUID 探测 `GET /extract-results/batch/{id}`：200 = 有效；
+  401/403 = 无效/过期（按响应里的 `msgCode` 给出 A0202/A0211 本地化提示）；其他 4xx = 鉴权已通过，只是探测 ID 不存在，视为有效。
 - 实现位置：`settings.ts` `addTokenControls()`；`api/MinerUClient.ts` `testConnection()`。
-- 状态：已实现。
-- 已知问题：判定偏宽松——HTTP 400/401/403 只要响应体不是 `A0202/A0211` 就报"Token looks valid"，可能把无效 token 误判为有效（**待核实**：需拿无效 token 实测服务端返回）。
+- 状态：**已实现 + 已修复（2026-10-23）**。
+- 缺陷回顾：旧判定读 `body.code`，但鉴权失败的实际响应体是 `{ success, msgCode, msg, traceId, total }`（字段叫 `msgCode`），
+  于是判断永不命中，**无效 token 也会报 "Token looks valid"**。已按实测响应重写判定（见 `TECHNICAL_REFERENCES.md` R-06）。
+- 验证方式：无效 token 实测 HTTP 401 + `msgCode: A0211`（2026-10-23）；**有效 token 路径未实测**（需用户点一次 [测试连接]）。
 - 关联：F-016。
 
 ### F-013 解析参数设置
@@ -240,16 +244,17 @@ flowchart TD
 - 预期行为：ZIP 内 `images/**` 按相对路径写到 `.md` 同目录 `images/` 下；嵌套子目录自动创建；Markdown 引用原样成立。
 - 实现位置：`utils/zipExtractor.ts` `extractFromZip()`；`ProgressModal.ts` `writeResult()`。
 - 状态：已实现。
-- 已知问题：①图片文件写入用 `adapter.writeBinary`，同名直接覆盖、无提示（图片名是内容哈希，风险低但非零）；②ZIP 解压按 `full.md` / `images/` 过滤，其余文件（layout.json 等）丢弃——符合需求。
+- 已知问题：①图片文件写入用 `adapter.writeBinary`，同名直接覆盖、无提示（图片名是内容哈希，覆盖即同内容，风险非零但极低）；②ZIP 解压按 `full.md` / `images/` 过滤，其余文件（layout.json 等）丢弃——符合需求。
+  2026-10-23 起写入顺序改为**先图片、后 .md**（.md 是提交标记，避免半成品 .md 引用缺失图片）。
 - 关联：F-004、F-009。
 
 ### F-016 API 错误本地化
 
 - 用户价值：报错说人话、说下一步动作。
 - 实现位置：`api/MinerUClient.ts` `localizeApiError()`（A0202/A0211/60005-60018 映射）+ `PAGE_LIMIT_PATTERNS`（把服务端自由文本"页数超限"归一为 `page-limit`）；文案在 i18n。
-- 状态：已实现。
+- 状态：已实现（2026-10-23 补双响应壳归一：`code` 与 `msgCode` 都能进映射，见 R-06）。
 - 已知问题：`DocumentConverter` 对分片失败抛 `new Error(t('partFailed')…)`（非 `MinerUError`），UI 层按普通 Error 处理——行为正确但类型不统一，未来加错误分类时易漏。
-- 关联：F-005、F-009、F-011。
+- 关联：F-005、F-009、F-011、F-012。
 
 ### F-017 HTTP 429 自动重试
 
@@ -264,7 +269,7 @@ flowchart TD
 - 用户价值：随时终止任务，不留后台流量。
 - 实现位置：`ProgressModal` 持有 `AbortController`，贯穿 `DocumentConverter` / `MinerUClient` / `pdfSplitter`。
 - 状态：已实现。
-- 已知问题：取消发生在写盘阶段时 `writeResult` 不检查 abort，可能仍写出文件（数据无损，但与"取消"预期不符）。`sleep()` 的 abort 监听器堆积问题已于 2026-10-23 修复（结束时移除监听）。
+- 已知问题：`sleep()` 的 abort 监听器堆积问题、写盘阶段取消仍会写盘的问题均已于 2026-10-23 修复（监听器结束时移除；`writeResult` 入口检查 abort）。若在多图写入中途取消，已写图片会留下（内容哈希命名，无害），.md 不会写出。
 - 关联：F-005、F-017。
 
 ### F-019 构建 / lint / 发版合规

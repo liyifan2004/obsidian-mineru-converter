@@ -2,7 +2,25 @@
 
 实质性开发的简要记录。只记长期有价值的内容；调试细节不入库。
 
-## 2026-10-23 — 功能账簿建立 + 首批修复（未提交）
+## 2026-10-23（下午）— 第二批：响应壳归一 + 令牌判定修复
+
+**触发**：用户要求"及时提交、符合 git 最佳实践、继续"。上午三个 commit（docs 5e675b0 / fix 1a8767b / test 9342395）落库后继续处理遗留问题。
+
+**证据先行**：用无效 token 实测 MinerU 接口（不涉及真实凭据），发现鉴权失败响应壳是
+`{ success, msgCode, msg, traceId, total }`，而代码只认 `{ code, ... }` —— 详见 `TECHNICAL_REFERENCES.md` R-06。
+
+**代码变更**：
+| 文件 | 变化 | 功能 |
+| --- | --- | --- |
+| `src/api/types.ts` | `ApiResponse` 同时声明两种响应壳（`code`/`msgCode`、`trace_id`/`traceId`、`success`） | F-016 |
+| `src/api/MinerUClient.ts` | `envelopeCode()` 归一取码；`testConnection` 判定重写：401/403=token 无效（原来**误报有效**），其他 4xx=鉴权已通过 | F-012、F-016 |
+| `src/ui/ProgressModal.ts` | `writeResult` 入口检查 abort；写入顺序改为先图片后 .md（.md 作提交标记） | F-018、F-015 |
+| `src/ui/ConflictModal.ts` | `settle()` 保证 promise 只 resolve 一次（原按钮路径会 double-resolve） | F-004 |
+
+**验证**：`npm run lint` 0 错 0 警；`npm run build` 通过；`npm test` 25 断言全过。
+**未验证**：有效 token 路径的 [测试连接]（需用户点一次）；UI 行为仍未真机回归。
+
+## 2026-10-23（上午）— 功能账簿建立 + 首批修复
 
 **目标**：建立功能账簿与技术参考，做九维系统审查，实施第一批高收益低风险修复。
 
@@ -33,4 +51,4 @@
 - UI 回归（终态按钮、后台通知）只做了代码级修复，未在真实 Obsidian 里点过。
 - `testConnection` 的宽松判定（400/401/403 皆可能误判为有效）未改——需拿无效 token 实测服务端返回后再定。
 - `extract_progress` 页级进度未接入 UI。
-- 未提交 commit（等用户确认后再提交）。
+- ~~未提交 commit~~ → 已按逻辑拆成三个 commit 提交：`5e675b0`（docs）/ `1a8767b`（fix）/ `9342395`（test），post-commit 钩子已自动同步到本机 vault。

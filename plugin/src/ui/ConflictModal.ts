@@ -8,7 +8,7 @@ export type ConflictChoice = 'overwrite' | 'skip' | 'cancel';
  * Promise resolving to the user's choice.
  */
 export class ConflictModal extends Modal {
-	private resolver!: (choice: ConflictChoice) => void;
+	private resolver?: (choice: ConflictChoice) => void;
 	private choice: ConflictChoice = 'cancel';
 
 	constructor(
@@ -48,15 +48,22 @@ export class ConflictModal extends Modal {
 	}
 
 	onClose(): void {
-		// If user dismisses via X, treat as cancel.
-		if (this.resolver) this.resolver(this.choice);
+		// Covers both the button path (resolve -> close) and dismissal via X.
+		this.settle(this.choice);
 		this.contentEl.empty();
 	}
 
 	private resolve(choice: ConflictChoice): void {
 		this.choice = choice;
-		this.resolver(choice);
+		this.settle(choice);
 		this.close();
+	}
+
+	/** Resolve the pending promise exactly once. */
+	private settle(choice: ConflictChoice): void {
+		const r = this.resolver;
+		this.resolver = undefined;
+		r?.(choice);
 	}
 
 	/** Public API used by callers; resolves with the user's choice. */
