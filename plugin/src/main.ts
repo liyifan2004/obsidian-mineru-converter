@@ -6,8 +6,6 @@ import {
 } from './settings';
 import { registerConvertFileCommand } from './commands/convertFile';
 
-const PLUGIN_VIEW_TYPE = 'obsidian-mineru-view'; // reserved for future use
-
 export default class MinerUConverterPlugin extends Plugin {
 	settings!: MinerUConverterSettings;
 
@@ -19,9 +17,6 @@ export default class MinerUConverterPlugin extends Plugin {
 
 		// Right-click menu + command palette
 		registerConvertFileCommand(this);
-
-		// Reserved view type registration hook (no-op for v0.1).
-		void PLUGIN_VIEW_TYPE;
 	}
 
 	onunload(): void {

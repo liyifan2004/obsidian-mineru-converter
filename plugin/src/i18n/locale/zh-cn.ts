@@ -1,20 +1,13 @@
 // 简体中文（zh-cn）
 
 export default {
-	// 插件元数据
-	pluginName: 'MinerU 转换器',
-	pluginDesc:
-		'在知识库中右键任意 PDF / Word / PPT / Excel / 图片，通过 MinerU 精准解析 API 一键转成 Markdown。',
-
 	// 文件菜单 / 命令面板
 	menuConvertFile: '通过 MinerU 转换为 Markdown',
 	cmdConvertFile: '通过 MinerU 转换为 Markdown',
-	cmdConvertFileTooltip: '使用 MinerU 将选中文件转换为 Markdown',
 
 	// 错误 / 提示
 	noApiToken:
 		'MinerU：尚未填写 API Token，请到 设置 → 第三方插件 → MinerU 转换器 配置。',
-	unsupportedFileType: 'MinerU：不支持该文件类型的转换。',
 	fileNotFound: 'MinerU：文件未找到，可能已被删除。',
 	fileTooLarge: (sizeMB: string) =>
 		`MinerU：文件 ${sizeMB} MB，超出 200 MB 上限。`,
@@ -38,6 +31,7 @@ export default {
 	conflictOverwrite: '覆盖',
 	conflictSkip: '跳过',
 	conflictCancel: '取消',
+	conflictSkipped: (mdPath: string) => `MinerU：已跳过（${mdPath} 已存在）。`,
 
 	// 进度弹窗
 	progressTitle: 'MinerU 转换中',
@@ -80,7 +74,6 @@ export default {
 
 	// 后台模式通知
 	bgDoneNotice: (mdPath: string) => `✅ MinerU 转换完成：${mdPath}`,
-	bgDoneOpenedNotice: (mdPath: string) => `✅ 已打开：${mdPath}`,
 	bgFailedNotice: (errMsg: string) => `❌ MinerU 转换失败：${errMsg}`,
 
 	// 设置
@@ -105,7 +98,6 @@ export default {
 		'开启后：超过 200 页的 PDF 会按每 200 页自动拆分、逐部分提交解析，再把各部分合并回一个 Markdown 文件（图片统一放进同一个 images/ 目录）。合并结果与未拆分时看起来完全一致。关闭后，超过 200 页的 PDF 会直接报错。',
 	settingsTestConnection: '测试连接',
 	settingsTestOk: 'Token 看起来有效。',
-	settingsTestFail: (msg: string) => `Token 校验失败：${msg}`,
 	settingsHintTitle: '使用说明',
 	settingsHintBody:
 		'1. 填入 Token 并点击「测试连接」。\n2. 在文件浏览器中右键任意支持的文件（PDF / Word / PPT / Excel / 图片）。\n3. 选择「通过 MinerU 转换为 Markdown」。\n4. 新生成的 .md 文件会出现在原文件旁；完成后会询问是否打开。',
@@ -114,6 +106,8 @@ export default {
 	modelVlm: 'vlm（推荐）',
 	modelPipeline: 'pipeline（默认）',
 	modelHtml: 'MinerU-HTML（仅 HTML 文件）',
+	htmlModelForced:
+		'HTML 文件将使用唯一支持 HTML 输入的 MinerU-HTML 模型解析（本次转换忽略你的模型设置）。',
 
 	// 语言选项
 	langCh: 'ch — 中英文混排',
@@ -133,7 +127,7 @@ export default {
 	apiErr60007: 'MinerU 模型服务暂时不可用，请稍后重试。',
 	apiErr60009: 'MinerU 任务队列已满，请稍候再试。',
 	apiErr60018: '已达每日配额上限（1000 页），请明天再试。',
-	apiErrRateLimit: '触发速率限制（HTTP 429），插件将自动重试。',
+	apiErrRateLimit: '触发速率限制（HTTP 429）次数过多，请稍等几分钟后再试。',
 	apiErrGeneric: (code: string | number, msg: string) =>
 		`MinerU 接口错误 [${code}]：${msg}`,
 };

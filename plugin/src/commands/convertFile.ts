@@ -1,6 +1,10 @@
 import { Menu, Notice, TAbstractFile, TFile } from 'obsidian';
 import type MinerUConverterPlugin from '../main';
-import { COMMAND_ID_CONVERT_FILE, SUPPORTED_EXTENSIONS } from '../utils/constants';
+import {
+	COMMAND_ID_CONVERT_FILE,
+	MAX_FILE_SIZE,
+	SUPPORTED_EXTENSIONS,
+} from '../utils/constants';
 import { t } from '../i18n/helpers';
 import { ProgressModal } from '../ui/ProgressModal';
 import { ConflictModal } from '../ui/ConflictModal';
@@ -99,6 +103,22 @@ async function runConvert(
 		return;
 	}
 
+	// The file may have been deleted or moved between the menu click and here.
+	if (!(plugin.app.vault.getAbstractFileByPath(file.path) instanceof TFile)) {
+		new Notice(t('fileNotFound'), 6000);
+		return;
+	}
+
+	// MinerU refuses anything over 200 MB. Say so locally instead of uploading
+	// a huge file and getting a generic server error back.
+	if (file.stat.size > MAX_FILE_SIZE) {
+		new Notice(
+			t('fileTooLarge')((file.stat.size / (1024 * 1024)).toFixed(1)),
+			8000,
+		);
+		return;
+	}
+
 	// Check sibling .md existence
 	const mdPath = siblingMdPath(file);
 	const adapter = plugin.app.vault.adapter;
@@ -113,7 +133,7 @@ async function runConvert(
 			return;
 		}
 		if (choice === 'skip') {
-			new Notice(`MinerU: skipped (${mdPath} already exists)`, 4000);
+			new Notice(t('conflictSkipped')(mdPath), 4000);
 			return;
 		}
 		// choice === 'overwrite' → continue

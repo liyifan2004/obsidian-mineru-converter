@@ -1,21 +1,13 @@
 // English (en) — base language. All keys defined here; other locales only override values.
 
 export default {
-	// Plugin metadata
-	pluginName: 'MinerU Converter',
-	pluginDesc:
-		'Right-click any PDF / Word / PPT / Excel / image in your vault and convert it to Markdown via the MinerU accurate-parse API.',
-
 	// File menu / command palette
 	menuConvertFile: 'Convert to Markdown via MinerU',
 	cmdConvertFile: 'Convert to Markdown via MinerU',
-	cmdConvertFileTooltip: 'Convert the selected file to Markdown using MinerU',
 
 	// Errors / notices
 	noApiToken:
 		'MinerU: API Token is not set. Open Settings → Community plugins → MinerU Converter to add your token.',
-	unsupportedFileType:
-		'MinerU: this file type is not supported for conversion.',
 	fileNotFound: 'MinerU: file not found — has it been deleted?',
 	fileTooLarge: (sizeMB: string) =>
 		`MinerU: file is ${sizeMB} MB, which exceeds the 200 MB limit.`,
@@ -39,6 +31,8 @@ export default {
 	conflictOverwrite: 'Overwrite',
 	conflictSkip: 'Skip',
 	conflictCancel: 'Cancel',
+	conflictSkipped: (mdPath: string) =>
+		`MinerU: skipped — ${mdPath} already exists.`,
 
 	// Progress modal
 	progressTitle: 'Converting via MinerU',
@@ -82,7 +76,6 @@ export default {
 
 	// Background-mode Notices
 	bgDoneNotice: (mdPath: string) => `✅ MinerU conversion done: ${mdPath}`,
-	bgDoneOpenedNotice: (mdPath: string) => `✅ Opened: ${mdPath}`,
 	bgFailedNotice: (errMsg: string) => `❌ MinerU conversion failed: ${errMsg}`,
 
 	// Settings
@@ -107,7 +100,6 @@ export default {
 		'When on: a PDF longer than 200 pages is split into 200-page parts, each part is parsed by MinerU, and the results are merged back into one Markdown file (all images share a single images/ folder). The merged file looks exactly like a non-split conversion. When off, an oversized PDF fails with an error.',
 	settingsTestConnection: 'Test connection',
 	settingsTestOk: 'Token looks valid.',
-	settingsTestFail: (msg: string) => `Token check failed: ${msg}`,
 	settingsHintTitle: 'How to use',
 	settingsHintBody:
 		'1. Paste your token above and click "Test connection".\n2. Right-click any supported file (PDF / Word / PPT / Excel / image) in the file explorer.\n3. Choose "Convert to Markdown via MinerU".\n4. The new .md file appears next to the original; you will be asked if you want to open it.',
@@ -116,6 +108,8 @@ export default {
 	modelVlm: 'vlm (recommended)',
 	modelPipeline: 'pipeline (default)',
 	modelHtml: 'MinerU-HTML (HTML files only)',
+	htmlModelForced:
+		'HTML files are parsed with the MinerU-HTML model (the only model that accepts HTML), overriding your model setting for this conversion.',
 
 	// Language options
 	langCh: 'ch — Chinese + English',
@@ -136,7 +130,7 @@ export default {
 	apiErr60009: 'MinerU task queue is full. Please wait a moment and retry.',
 	apiErr60018: 'Daily quota exceeded (1000 pages). Try again tomorrow.',
 	apiErrRateLimit:
-		'Rate limited (HTTP 429). The plugin will automatically retry.',
+		'Rate limited (HTTP 429) too many times. Please wait a few minutes and try again.',
 	apiErrGeneric: (code: string | number, msg: string) =>
 		`MinerU API error [${code}]: ${msg}`,
 };

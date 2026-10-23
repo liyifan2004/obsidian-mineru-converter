@@ -1,5 +1,12 @@
 import { TFile, Vault, requestUrl } from 'obsidian';
-import { MINERU_BASE_URL, HTTP_429_RETRY_MS, SINGLE_FILE_DATA_ID } from '../utils/constants';
+import {
+	MINERU_BASE_URL,
+	HTTP_429_RETRY_MS,
+	HTTP_429_MAX_RETRIES,
+	DEFAULT_POLL_INTERVAL_SEC,
+	MAX_POLL_TIME_MS,
+	SINGLE_FILE_DATA_ID,
+} from '../utils/constants';
 import { Logger } from '../utils/logger';
 import { extractFromZip, type ExtractedResult } from '../utils/zipExtractor';
 import { t } from '../i18n/helpers';
@@ -10,7 +17,6 @@ import {
 	ExtractResultItem,
 	MinerUConfig,
 	ProgressCallback,
-	ProgressUpdate,
 	SubmitBatchResponse,
 } from './types';
 
@@ -69,6 +75,8 @@ export function localizeApiError(err: unknown): string {
 			return t('apiErrA0211');
 		case 'page-limit':
 			return t('apiErr60006');
+		case 'rate-limit':
+			return t('apiErrRateLimit');
 		case -60005:
 		case '60005':
 			return t('apiErr60005');
@@ -301,8 +309,8 @@ export class MinerUClient {
 		onProgress: ProgressCallback,
 		signal?: AbortSignal,
 	): Promise<ExtractResultItem[]> {
-		const POLL_INTERVAL_MS = 15_000;
-		const MAX_POLL_MS = 2 * 60 * 60 * 1000;
+		const POLL_INTERVAL_MS = DEFAULT_POLL_INTERVAL_SEC * 1000;
+		const MAX_POLL_MS = MAX_POLL_TIME_MS;
 		const start = Date.now();
 		const done = new Set<string>();
 
@@ -402,11 +410,22 @@ export class MinerUClient {
 		}
 
 		// Manual retry loop (we keep this synchronous-feeling for 429).
+		let rateLimitRetries = 0;
 		while (true) {
 			if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 			const res = await requestUrl(init);
 
 			if (res.status === 429) {
+				rateLimitRetries += 1;
+				if (rateLimitRetries > HTTP_429_MAX_RETRIES) {
+					// Bounded on purpose: retrying forever keeps the task alive
+					// with zero feedback. A clear "come back later" beats a hang.
+					throw new MinerUError(
+						`Rate limited (HTTP 429) ${HTTP_429_MAX_RETRIES} times`,
+						'rate-limit',
+						res.status,
+					);
+				}
 				log.warn('HTTP 429 — sleeping', HTTP_429_RETRY_MS, 'ms');
 				await this.sleep(HTTP_429_RETRY_MS, signal);
 				continue;
@@ -460,23 +479,18 @@ export class MinerUClient {
 				reject(new DOMException('Aborted', 'AbortError'));
 				return;
 			}
-			const timer = window.setTimeout(resolve, ms);
-			signal?.addEventListener(
-				'abort',
-				() => {
-					window.clearTimeout(timer);
-					reject(new DOMException('Aborted', 'AbortError'));
-				},
-				{ once: true },
-			);
+			// The abort listener MUST be removed when the timer settles: a long
+			// polling run calls this hundreds of times on the same AbortSignal,
+			// and orphaned listeners would pile up for the whole conversion.
+			const onAbort = (): void => {
+				window.clearTimeout(timer);
+				reject(new DOMException('Aborted', 'AbortError'));
+			};
+			const timer = window.setTimeout(() => {
+				signal?.removeEventListener('abort', onAbort);
+				resolve();
+			}, ms);
+			signal?.addEventListener('abort', onAbort, { once: true });
 		});
 	}
-}
-
-// Convenience: emit a structured ProgressUpdate wrapper that callers can use.
-export function progress(
-	phase: ProgressUpdate['phase'],
-	extra?: Partial<ProgressUpdate>,
-): ProgressUpdate {
-	return { phase, ...extra };
 }

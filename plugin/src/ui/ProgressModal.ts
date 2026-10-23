@@ -1,6 +1,7 @@
 import { Modal, Notice, TFile } from 'obsidian';
 import { MinerUClient, MinerUError, localizeApiError } from '../api/MinerUClient';
 import { DocumentConverter } from '../conversion/DocumentConverter';
+import { resolveModelVersion } from '../utils/constants';
 import { t } from '../i18n/helpers';
 import type { MinerUConverterSettings } from '../settings';
 import type { ProgressUpdate } from '../api/types';
@@ -16,13 +17,14 @@ type Mode = 'foreground' | 'background';
  *   1. User invokes "Convert to Markdown".
  *   2. runConversion() starts in the background of THIS modal.
  *   3a. If the modal is still open when the work finishes, it shows a
- *       "完成" screen with [打开 Markdown] [关闭] buttons.
- *   3b. If the user clicks [后台运行], the modal closes immediately and the
- *       conversion continues in the background; the user sees a Notice on
- *       completion (with [Open] [Dismiss] actions).
- *   3c. If the user clicks [取消] mid-flight, the work aborts and the modal
+ *       "done" screen with [Open Markdown] [Close] buttons.
+ *   3b. If the user clicks [Run in background], the modal closes immediately
+ *       and the conversion continues; a sticky Notice with an [Open Markdown]
+ *       button appears on completion (the file is NOT opened automatically —
+ *       that would steal focus).
+ *   3c. If the user clicks [Cancel] mid-flight, the work aborts and the modal
  *       closes immediately (no second confirmation screen).
- *   3d. If the user clicks [打开 Markdown], the new file opens and the modal
+ *   3d. If the user clicks [Open Markdown], the new file opens and the modal
  *       closes automatically.
  *
  * onClose() only aborts the underlying work when:
@@ -125,7 +127,6 @@ export class ProgressModal extends Modal {
 		// Only abort if user dismissed the modal without handing off to
 		// background AND we haven't already finished.
 		if (this.mode !== 'background' && !this.terminal) {
-			this.cancelled = false; // see handleCancel — flag is local there
 			this.abortController?.abort();
 		}
 		this.contentEl.empty();
@@ -133,15 +134,24 @@ export class ProgressModal extends Modal {
 
 	// ---------- logic ----------
 
-	private cancelled = false;
-
 	private async runConversion(): Promise<void> {
 		this.abortController = new AbortController();
+
+		// HTML input is accepted only by the MinerU-HTML model. Switch per file
+		// (and say so) instead of letting the request fail server-side with an
+		// error that does not point at the real cause.
+		const modelVersion = resolveModelVersion(
+			this.settings.modelVersion,
+			this.file.name,
+		);
+		if (modelVersion !== this.settings.modelVersion) {
+			new Notice(t('htmlModelForced'), 6000);
+		}
 
 		const client = new MinerUClient(
 			{
 				token: this.settings.apiToken,
-				modelVersion: this.settings.modelVersion,
+				modelVersion,
 				language: this.settings.language,
 				enableFormula: this.settings.enableFormula,
 				enableTable: this.settings.enableTable,
@@ -172,7 +182,7 @@ export class ProgressModal extends Modal {
 
 			this.handleDone(mdPath);
 		} catch (err) {
-			if (this.cancelled || this.abortController.signal.aborted) {
+			if (this.abortController.signal.aborted) {
 				this.handleCancelled();
 				return;
 			}
@@ -338,8 +348,10 @@ export class ProgressModal extends Modal {
 		this.statusEl.addClass('is-success');
 		this.cancelBtn.addClass('mineru-hidden');
 		this.backgroundBtn.addClass('mineru-hidden');
-		this.closeBtn.addClass('mineru-hidden'); // hidden — Open auto-closes
-		this.openBtn.addClass('mineru-hidden');
+		// Terminal actions: [Open Markdown] (primary, closes on click) and
+		// [Close] for "I don't want to open it".
+		this.openBtn.removeClass('mineru-hidden');
+		this.closeBtn.removeClass('mineru-hidden');
 		this.openBtn.dataset.mdPath = mdPath;
 	}
 
@@ -358,7 +370,7 @@ export class ProgressModal extends Modal {
 		this.cancelBtn.addClass('mineru-hidden');
 		this.backgroundBtn.addClass('mineru-hidden');
 		this.openBtn.addClass('mineru-hidden');
-		this.closeBtn.addClass('mineru-hidden');
+		this.closeBtn.removeClass('mineru-hidden');
 	}
 
 	private handleCancelled(): void {
@@ -376,7 +388,7 @@ export class ProgressModal extends Modal {
 		this.cancelBtn.addClass('mineru-hidden');
 		this.backgroundBtn.addClass('mineru-hidden');
 		this.openBtn.addClass('mineru-hidden');
-		this.closeBtn.addClass('mineru-hidden');
+		this.closeBtn.removeClass('mineru-hidden');
 	}
 
 	private async notifyBackgroundComplete(
@@ -395,23 +407,31 @@ export class ProgressModal extends Modal {
 		}
 
 		if (mdPath) {
-			const file = this.vault.getAbstractFileByPath(mdPath);
-			if (file instanceof TFile) {
-				// No native "open on click" in Obsidian Notice; we open it
-				// via the workspace immediately and just show a transient toast.
-				const leaf = this.app.workspace.getLeaf();
-				void leaf.openFile(file);
-				new Notice(t('bgDoneOpenedNotice')(mdPath), 6000);
-			} else {
-				new Notice(t('bgDoneNotice')(mdPath), 6000);
-			}
+			// A Notice has no built-in action API, but it accepts a
+			// DocumentFragment, so the "Open" button is built into the fragment.
+			// This works on every supported Obsidian version (`messageEl` only
+			// exists since 1.8.7) and, unlike auto-opening the file, it never
+			// steals focus from whatever the user is doing.
+			const fragment = createFragment();
+			fragment.createSpan({ text: t('bgDoneNotice')(mdPath) });
+			const openBtn = fragment.createEl('button', {
+				text: t('progressOpenResult'),
+				cls: 'mod-cta',
+			});
+			const notice = new Notice(fragment, 0); // sticky — the button needs time
+			openBtn.addEventListener('click', () => {
+				notice.hide();
+				const file = this.vault.getAbstractFileByPath(mdPath);
+				if (file instanceof TFile) {
+					void this.app.workspace.getLeaf().openFile(file);
+				}
+			});
 		}
 	}
 
 	// ---------- button handlers ----------
 
 	private handleCancel(): void {
-		this.cancelled = true;
 		this.abortController?.abort();
 		// Immediately close — no second confirmation page.
 		this.close();
