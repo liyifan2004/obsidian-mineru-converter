@@ -15,11 +15,14 @@ export default defineConfig([
 		// `main.js` is the esbuild bundle (generated). scripts/, hooks/ and the
 		// two *.mjs files are Node build tooling — they run on the developer's
 		// machine, never inside Obsidian, so the mobile-safety rules don't apply.
+		// test/ is the offline verification harness (Node too; it prints to
+		// console on purpose and is not part of the shipped plugin).
 		ignores: [
 			'main.js',
 			'node_modules/**',
 			'scripts/**',
 			'hooks/**',
+			'test/**',
 			'esbuild.config.mjs',
 			'version-bump.mjs',
 		],
