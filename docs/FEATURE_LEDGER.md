@@ -242,11 +242,11 @@ flowchart TD
 
 - 用户价值：转换产物里的图片可用，Markdown 引用可解析。
 - 预期行为：ZIP 内 `images/**` 按相对路径写到 `.md` 同目录 `images/` 下；嵌套子目录自动创建；Markdown 引用原样成立。
-- 实现位置：`utils/zipExtractor.ts` `extractFromZip()`；`ProgressModal.ts` `writeResult()`。
-- 状态：已实现。
+- 实现位置：`utils/zipExtractor.ts` `extractFromZip()` / `safeImageKey()`；`ProgressModal.ts` `writeResult()`。
+- 状态：已实现（2026-11-03 补路径穿越防护，见 O-001）。
 - 已知问题：①图片文件写入用 `adapter.writeBinary`，同名直接覆盖、无提示（图片名是内容哈希，覆盖即同内容，风险非零但极低）；②ZIP 解压按 `full.md` / `images/` 过滤，其余文件（layout.json 等）丢弃——符合需求。
   2026-10-23 起写入顺序改为**先图片、后 .md**（.md 是提交标记，避免半成品 .md 引用缺失图片）。
-- 关联：F-004、F-009。
+- 关联：F-004、F-009、O-001。
 
 ### F-016 API 错误本地化
 
@@ -314,12 +314,21 @@ flowchart TD
 | i18n 6 个 key | `en.ts` / `zh-cn.ts` | 删除（见 F-014） |
 | `HTML_EXTENSIONS` / `MAX_FILE_SIZE` / `DEFAULT_POLL_INTERVAL_SEC` / `MAX_POLL_TIME_MS` | `utils/constants.ts` | **保留并接线**（分别用于 F-010 / F-011 / F-005 轮询） |
 
+## 审查与优化清单
+
+优先级：P0 数据丢失/崩溃/核心不可用；P1 核心缺陷或高频障碍；P2 明确收益的改进；P3 低风险优化与探索。
+
+| ID | 优先级 | 问题 | 证据 | 方案 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| O-001 | P0 | **ZIP 路径穿越**：结果 ZIP 来自远端服务器，条目名是不可信输入。`fflate` 不做净化，原样返回 `result/images/../../../../evil.txt`；Obsidian `normalizePath()` 只折叠斜杠、**不解析 `..`**；`adapter.writeBinary()` 会照写。可写出 `images/` 目录之外的文件 | 实测：构造恶意 ZIP → `extractFromZip()` 返回的 key 含 `../../../../evil.txt`、`../sibling.png`（已复现）；`obsidian.d.ts:4606` `normalizePath` 签名无 `..` 处理说明 | 新增 `safeImageKey()`：拒绝含 `..` 段、绝对路径、盘符、反斜杠、空/`.` 段的条目；解压端与写入端**双重校验**（写入端为纵深防御，不信任调用方） | ✅ 2026-11-03 完成（新增 `verify-zip.ts` 12 项断言，全通过） |
+
 ## 测试覆盖现状
 
 | 范围 | 手段 | 状态 |
 | --- | --- | --- |
 | PDF 拆分/合并（F-009） | `plugin/test/verify-split.ts`（18 项断言，含逐页比对解码内容流字节、边界 200/201 页、图片去重改名） | **已验证**：`npm test` 2026-10-23 全通过 |
 | ZIP 解压（F-015） | `plugin/test/verify-zip.ts`（7 项断言） | **已验证**：同上 |
+| ZIP 路径穿越防护（O-001） | `plugin/test/verify-zip.ts`（+12 项断言：恶意 ZIP 条目被丢弃、`safeImageKey` 各类输入） | **已验证**：2026-11-03 全通过 |
 | 测试入口 | `plugin/test/run.mjs`（esbuild 打包后跑 node）+ `npm test` | 已实现；测试文件不进 `npm run build` 的 tsc 检查范围 |
 | 类型 / lint | `tsc -noEmit` + eslint-obsidianmd | 每次构建自动执行，当前 0 错 0 警 |
 | UI 流程（F-001/004/006/007/008） | 无 | **未验证**（需真实 Obsidian） |
