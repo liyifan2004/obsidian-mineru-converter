@@ -11,6 +11,9 @@
 plugin/main.js
 plugin/*.map
 
+# Local release zips (stale build outputs — releases are published by CI)
+plugin/*.zip
+
 # Obsidian vault data — never commit
 data.json
 

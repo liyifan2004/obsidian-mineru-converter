@@ -46,6 +46,9 @@ jobs:
       - name: Lint (Obsidian review rules)
         run: npm run lint
 
+      - name: Tests (offline verify scripts)
+        run: npm run test
+
       - name: Build plugin
         run: npm run build
 
