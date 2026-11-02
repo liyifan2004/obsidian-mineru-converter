@@ -4,7 +4,7 @@
  * Run: esbuild-bundle to ESM, then `node` it.
  */
 import { zipSync, strToU8 } from 'fflate';
-import { extractFromZip } from '../src/utils/zipExtractor';
+import { extractFromZip, safeImageKey } from '../src/utils/zipExtractor';
 
 let failures = 0;
 function check(label: string, cond: boolean, extra = ''): void {
@@ -44,6 +44,47 @@ const out2 = extractFromZip(
 	noMd.buffer.slice(noMd.byteOffset, noMd.byteOffset + noMd.byteLength),
 );
 check('returns null when full.md missing', out2 === null);
+
+// --- Path traversal hardening (2026-11-03) ---
+// The archive is downloaded from a remote server, so entry names are
+// untrusted. fflate does not sanitize them, and Obsidian's normalizePath()
+// does not resolve "..", so a traversal key could write outside images/.
+
+const evil = zipSync({
+	'result/full.md': strToU8('# x\n\n![](images/ok.jpg)'),
+	'result/images/ok.jpg': new Uint8Array([1, 2, 3]),
+	'result/images/../../../../evil.txt': strToU8('PWNED'),
+	'result/images/../sibling.png': new Uint8Array([9]),
+	'result/images/sub/../../escape.jpg': new Uint8Array([8]),
+});
+const evilOut = extractFromZip(
+	evil.buffer.slice(evil.byteOffset, evil.byteOffset + evil.byteLength),
+);
+const evilKeys = evilOut ? [...evilOut.images.keys()] : [];
+check('keeps the legitimate image', evilKeys.includes('ok.jpg'));
+check(
+	'drops ../ traversal entry',
+	!evilKeys.some((k) => k.includes('..')),
+	`got ${JSON.stringify(evilKeys)}`,
+);
+check(
+	'no key escapes the images folder',
+	evilKeys.every((k) => !k.startsWith('/') && !k.includes('../')),
+	`got ${JSON.stringify(evilKeys)}`,
+);
+
+check('safeImageKey keeps a plain name', safeImageKey('abc.jpg') === 'abc.jpg');
+check('safeImageKey keeps a nested name', safeImageKey('sub/deep.png') === 'sub/deep.png');
+check('safeImageKey rejects ..', safeImageKey('../evil.txt') === null);
+check(
+	'safeImageKey rejects embedded ..',
+	safeImageKey('sub/../../evil.txt') === null,
+);
+check('safeImageKey rejects absolute path', safeImageKey('/etc/passwd') === null);
+check('safeImageKey rejects drive letter', safeImageKey('C:/evil.txt') === null);
+check('safeImageKey rejects backslash', safeImageKey('..\\evil.txt') === null);
+check('safeImageKey rejects empty', safeImageKey('') === null);
+check('safeImageKey rejects dot-only', safeImageKey('.') === null);
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECKS FAILED`);
 process.exit(failures === 0 ? 0 : 1);

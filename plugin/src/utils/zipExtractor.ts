@@ -1,4 +1,7 @@
 import { unzipSync } from 'fflate';
+import { Logger } from './logger';
+
+const log = new Logger('zipExtractor');
 
 /**
  * The output of unpacking a MinerU result ZIP.
@@ -48,6 +51,15 @@ export interface ExtractedResult {
  * and wraps callbacks with `new Function()` — exactly the "dynamic code
  * execution" / "runtime script injection" patterns the Obsidian plugin review
  * scanner rejects. fflate is pure computation with no DOM or eval surface.
+ *
+ * Security note (2026-11-03): the archive is downloaded from a remote server,
+ * so its entry names are untrusted input. `fflate` does NOT sanitize them —
+ * it happily returns `result/images/../../../../evil.txt` as a key. Obsidian's
+ * `normalizePath()` collapses slashes but does NOT resolve `..` segments, and
+ * `adapter.writeBinary()` writes whatever path it is handed. Left unchecked,
+ * a malicious or compromised result archive could write files outside the
+ * `images/` folder. {@link safeImageKey} rejects such entries before they ever
+ * reach the vault.
  */
 export function extractFromZip(zipBuffer: ArrayBuffer): ExtractedResult | null {
 	// Only inflate what we need: `full.md` and anything under `images/`.
@@ -77,13 +89,58 @@ export function extractFromZip(zipBuffer: ArrayBuffer): ExtractedResult | null {
 		const key = path.slice(idx + 'images/'.length);
 		if (!key) continue;
 
+		// Reject path-traversal / absolute-path entries. The archive comes
+		// from the network, so `key` is attacker-controlled.
+		const safeKey = safeImageKey(key);
+		if (safeKey === null) {
+			log.warn('Dropped unsafe image path from archive:', key);
+			continue;
+		}
+
 		// Deduplicate: if two archive entries map to the same key (rare),
 		// keep the first — the second would just clobber it.
-		if (images.has(key)) continue;
-		images.set(key, toArrayBuffer(data));
+		if (images.has(safeKey)) continue;
+		images.set(safeKey, toArrayBuffer(data));
 	}
 
 	return { mdContent, images };
+}
+
+/**
+ * Validate an archive-relative image path so it can only ever land inside the
+ * intended `images/` folder.
+ *
+ * Returns the cleaned key, or `null` when the entry must be dropped.
+ *
+ * Rejected:
+ *   - any segment equal to `..`  (path traversal)
+ *   - absolute paths (`/foo`, `C:\foo`) and Windows drive letters
+ *   - backslash separators, which some unarchivers treat as path separators
+ *   - empty or `.`-only segments that would collapse to a bare directory
+ *
+ * Kept: plain relative names and nested sub-directories (`sub/deep.png`),
+ * since MinerU does emit nested `images/` folders for some documents.
+ */
+export function safeImageKey(key: string): string | null {
+	// Backslashes are path separators on Windows; a key containing them could
+	// escape via `..\..`. Normalize to `/` first so the segment check below
+	// sees them — but reject the original if the two forms disagree in a way
+	// that changes meaning. Simplest and safest: refuse backslashes outright.
+	if (key.includes('\\')) return null;
+	if (key.startsWith('/')) return null;
+	// Windows drive letter (`C:/foo`) or UNC-ish prefix.
+	if (/^[a-zA-Z]:/.test(key)) return null;
+	if (key.includes('\0')) return null;
+
+	const segments = key.split('/');
+	const clean: string[] = [];
+	for (const seg of segments) {
+		if (seg === '' || seg === '.') continue; // collapse no-ops
+		if (seg === '..') return null; // traversal — drop the whole entry
+		clean.push(seg);
+	}
+	if (clean.length === 0) return null;
+	return clean.join('/');
 }
 
 function toArrayBuffer(u8: Uint8Array): ArrayBuffer {

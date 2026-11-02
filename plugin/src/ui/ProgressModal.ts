@@ -2,9 +2,13 @@ import { Modal, Notice, TFile } from 'obsidian';
 import { MinerUClient, MinerUError, localizeApiError } from '../api/MinerUClient';
 import { DocumentConverter } from '../conversion/DocumentConverter';
 import { resolveModelVersion } from '../utils/constants';
+import { safeImageKey } from '../utils/zipExtractor';
 import { t } from '../i18n/helpers';
 import type { MinerUConverterSettings } from '../settings';
 import type { ProgressUpdate } from '../api/types';
+import { Logger } from '../utils/logger';
+
+const log = new Logger('ProgressModal');
 
 type Mode = 'foreground' | 'background';
 
@@ -229,7 +233,17 @@ export class ProgressModal extends Modal {
 			}
 
 			for (const [relPath, buf] of images) {
-				const targetPath = `${imagesDir}/${relPath}`;
+				// Defense in depth: `safeImageKey` already ran in the
+				// extractor, but this is the last gate before a path reaches
+				// `adapter.writeBinary`. A traversal key here would write
+				// outside the `images/` folder, so re-validate rather than
+				// trust the caller.
+				const safeRel = safeImageKey(relPath);
+				if (safeRel === null) {
+					log.warn('Refusing to write unsafe image path:', relPath);
+					continue;
+				}
+				const targetPath = `${imagesDir}/${safeRel}`;
 				// Ensure nested subdirs like `images/sub/foo.jpg` are created.
 				const targetDir = targetPath.includes('/')
 					? targetPath.slice(0, targetPath.lastIndexOf('/'))
