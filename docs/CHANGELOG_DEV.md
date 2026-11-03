@@ -2,6 +2,33 @@
 
 实质性开发的简要记录。只记长期有价值的内容；调试细节不入库。
 
+## 2026-11-03 — 0.3.4：ZIP 路径穿越修复
+
+**触发**：自动化例行研究轮（第四轮）深入 `plugin/src/**` 代码层，逐环核实「远端 ZIP → 落盘」这条链路。
+
+**问题**：结果 ZIP 来自 MinerU 服务器，条目名是不可信输入。三个环节各自都不负责，组合起来构成一条可写出 `images/` 目录之外文件的路径：
+
+| 环节 | 核实结果 |
+| --- | --- |
+| `fflate` 的 `unzipSync()` | **不净化条目名**（官方文档说明路径安全是调用方义务） |
+| Obsidian `normalizePath()` | **不解析 `..` 段**（只统一分隔符、折叠斜杠、去首尾斜杠） |
+| `ProgressModal.writeResult()` | 直接把拼出的路径交给 `adapter.writeBinary()` |
+
+**实测**：构造恶意 ZIP 调用项目自己的 `extractFromZip()`，返回的 image key 含 `../../../../evil.txt` 与 `../sibling.png`。
+
+**代码变更**：
+| 文件 | 变化 |
+| --- | --- |
+| `src/utils/zipExtractor.ts` | 新增导出函数 `safeImageKey()`；`extractFromZip()` 逐条校验并丢弃非法条目 |
+| `src/ui/ProgressModal.ts` | 写入前再校验一次（纵深防御：写入层不信任调用方） |
+| `test/verify-zip.ts` | 新增 12 项断言（恶意 ZIP 被丢弃 + `safeImageKey` 各类输入） |
+
+**保留能力**：嵌套子目录（`sub/deep.png`）仍可用——MinerU 确实会产出嵌套 `images/` 目录。
+
+**验证**：`npm test` 全通过（verify-split 18 项 + verify-zip 19 项）；`npm run lint` 0 错 0 警；`npm run build` 通过。vault 内产物与本地构建 md5 逐字节一致。
+
+**未验证**：Obsidian 实机未跑（需真实 MinerU 结果 ZIP 转换一次，确认图片仍正常写入 `images/`）。
+
 ## 2026-10-23（下午）— 第二批：响应壳归一 + 令牌判定修复
 
 **触发**：用户要求"及时提交、符合 git 最佳实践、继续"。上午三个 commit（docs 5e675b0 / fix 1a8767b / test 9342395）落库后继续处理遗留问题。
