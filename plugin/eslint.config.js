@@ -25,6 +25,12 @@ export default defineConfig([
 			'test/**',
 			'esbuild.config.mjs',
 			'version-bump.mjs',
+			// version-sync.mjs / version-sync.d.mts 是发版脚本的纯逻辑与
+			// 它的类型声明：Node 侧工具，不进 Obsidian 运行时。
+			// .d.mts 尤其要排除 —— 它的类型感知规则需要 program 信息，
+			// 而本仓库的 tsconfig 只 include 了 src/**/*.ts。
+			'version-sync.mjs',
+			'version-sync.d.mts',
 		],
 	},
 	...obsidianmd.configs.recommended,
