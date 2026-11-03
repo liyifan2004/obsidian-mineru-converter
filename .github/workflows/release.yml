@@ -36,7 +36,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          # 固定 22（与 CI 及 fleet 其余仓库一致）。原先写 lts/*，会随 Node
+          # LTS 换代而漂移 —— 实测当前 lts/* 已解析到 Node 26.13（npm 11.20），
+          # 而 CI 用的是 22。商店审查会自己 npm ci && npm run build 并要求与
+          # release 产物逐字节一致，两个 Node 大版本下的产物不保证一致。
+          node-version: 22
           cache: npm
           cache-dependency-path: plugin/package-lock.json
 
@@ -71,11 +75,20 @@ jobs:
 
       # Only the three files Obsidian downloads. No zips, no extras — the
       # review scanner flags any additional release asset.
+      #
+      # 用官方 gh CLI（与 fleet 其余 7 个仓库一致），而不是第三方的
+      # softprops/action-gh-release —— 少一个第三方 action 依赖，行为可读。
+      # 资产名仍是顶层 main.js / manifest.json / styles.css：gh CLI 上传时
+      # 用 os.FileInfo.Name() 取 basename（见 cli/cli 的
+      # pkg/cmd/release/shared/upload.go），目录前缀会被剥掉，与原先
+      # softprops 的行为一致 —— 已发布过的 0.3.1~0.3.4 资产名可佐证。
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: |
-            plugin/main.js
-            plugin/manifest.json
-            plugin/styles.css
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            plugin/main.js plugin/manifest.json plugin/styles.css \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
