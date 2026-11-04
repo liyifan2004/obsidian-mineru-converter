@@ -31,10 +31,10 @@ jobs:
         working-directory: plugin
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # 固定 22（与 CI 及 fleet 其余仓库一致）。原先写 lts/*，会随 Node
           # LTS 换代而漂移 —— 实测当前 lts/* 已解析到 Node 26.13（npm 11.20），
