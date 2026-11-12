@@ -8,6 +8,7 @@
  *
  * Run: esbuild-bundle to ESM, then `node` it.
  */
+import { readFileSync } from 'node:fs';
 import {
 	compareSemver,
 	computeVersionSync,
@@ -139,6 +140,51 @@ computeVersionSync({
 check('inputs not mutated (manifest)', originalManifest.version === '0.3.4');
 check('inputs not mutated (package)', originalPackage.version === '0.3.4');
 check('inputs not mutated (versions)', Object.keys(originalVersions).join(',') === '0.3.4');
+
+// --- 磁盘上的版本号一致性 ---
+
+/**
+ * 为什么要有这一层
+ *
+ * `computeVersionSync` 只管三个对象：manifest / package.json / versions.json。
+ * 但 `npm version` 还会改 **package-lock.json** —— 它的版本号不在
+ * 上面三个里，于是**漏掉了**。
+ *
+ * 实测（2026-11-13）：MSE / JEV / folio 三个仓库的发版提交都漏掉了
+ * package-lock.json，仓库里 lockfile 停在**上一个版本号**。
+ * lockfile 不进发布产物（商店只下载 main.js / manifest.json / styles.css），
+ * 所以不影响用户，但「版本号已同步」这句话不成立。
+ *
+ * 这一层直接查磁盘 —— 不信任任何脚本的自述。
+ */
+const readJson = (path: string): Record<string, unknown> =>
+	JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
+
+const diskManifest = readJson('manifest.json');
+const diskTarget = diskManifest.version as string;
+
+check(
+	'package.json version matches manifest.json',
+	readJson('package.json').version === diskTarget,
+);
+check(
+	'package-lock.json version matches manifest.json',
+	readJson('package-lock.json').version === diskTarget,
+);
+check(
+	'package-lock.json packages[""] version matches manifest.json',
+	(
+		readJson('package-lock.json').packages as Record<
+			string,
+			Record<string, unknown>
+		>
+	)['']?.version === diskTarget,
+);
+check(
+	'versions.json registers the current version',
+	(readJson('versions.json') as Record<string, unknown>)[diskTarget] ===
+		diskManifest.minAppVersion,
+);
 
 if (failures > 0) {
 	console.log(`\n${failures} check(s) failed.`);
