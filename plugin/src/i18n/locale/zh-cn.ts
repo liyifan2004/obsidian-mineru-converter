@@ -77,7 +77,8 @@ export default {
 	bgFailedNotice: (errMsg: string) => `❌ MinerU 转换失败：${errMsg}`,
 
 	// 设置
-	settingsTitle: 'MinerU 转换器',
+	// 分组标题**不能含插件名**（官方规则 no-problematic-settings-headings）。
+	settingsSection: '文档转换',
 	settingsTokenName: 'API Token',
 	settingsTokenDesc:
 		'请到 https://mineru.net/apiManage/apiManage 申请。Token 仅保存在本地 Vault，不会上传。',

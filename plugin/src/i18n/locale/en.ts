@@ -79,7 +79,12 @@ export default {
 	bgFailedNotice: (errMsg: string) => `❌ MinerU conversion failed: ${errMsg}`,
 
 	// Settings
-	settingsTitle: 'MinerU Converter',
+	// 分组标题**不能含插件名** —— 官方规则
+	// settings-tab/no-problematic-settings-headings 禁止标题里出现插件名 /
+	// settings / options / general（error 级）。
+	// 同 fleet 的 obsidian-media-speed-enhancer 1.0.42 就是因此被商店审查打回、
+	// 插件从目录列表下架。所以这里用功能分类名，而不是插件名。
+	settingsSection: 'Conversion',
 	settingsTokenName: 'API Token',
 	settingsTokenDesc:
 		'Get your token at https://mineru.net/apiManage/apiManage. Stored locally in this vault only.',

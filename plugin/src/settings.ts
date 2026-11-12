@@ -53,7 +53,8 @@ export class MinerUConverterSettingTab extends PluginSettingTab {
 		return [
 			{
 				type: 'group',
-				heading: t('settingsTitle'),
+				// 分组标题不能含插件名 —— 详见 i18n 里 settingsSection 的注释。
+				heading: t('settingsSection'),
 				items: [
 					{
 						name: t('settingsHintTitle'),
@@ -132,7 +133,7 @@ export class MinerUConverterSettingTab extends PluginSettingTab {
 
 		// Heading
 		new Setting(containerEl)
-			.setName(t('settingsTitle'))
+			.setName(t('settingsSection'))
 			.setHeading();
 
 		// How-to hint
